@@ -1,0 +1,453 @@
+\newpage
+\section{\MakeUppercase{SYSTEM ARCHITECTURE AND METHODOLOGY}}
+
+\subsection{Proposed System Architecture}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-SuperMainArchitecture.drawio.pdf}
+    \caption{Proposed System Architecture}
+\end{figure}
+
+Our system pipeline begins with audio input which is user's speech. The input should be in English language. The audio is then passed to ASR module, which performs feature extraction (Mel Spectrograms), then it used our neural network ie Conformer to convert the audio into text transcription. Once the spoken input is transcribed completely, then the text is passed to a Small Language Model (SLM). The SLM is fine tuned to customized dataset optimised for local inference and response generation. The SLM interprets the meaning, context and intent behind 
+transcribed input and then generates coherent, text response. Finally, the response is returned to user using Text-To-Speech (TTS) module in accordance to user input prompt. Text response is also directly available as a output form. 
+
+\subsection{Automatic Speech Recognition}
+\subsubsection{Proposed Architecture of ASR}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-Main Architecture.drawio.pdf}
+    \caption{Proposed Architecture of ASR}
+\end{figure}
+
+\subsubsection{Feature Extraction}
+\textbf{Sampling Rate}\\
+This sample rate is consistent across the LibriSpeech datasets, which ensures consistency across all inputs (for training as well as inference). It is also a common practice in speech processing. Human speech typically contains most of its important information in the frequency range up to 8 kHz. According to the Nyquist theorem, to accurately capture frequencies up to 8 kHz, we need at least 2 × 8,000 = 16,000 samples per second
+
+\textbf{Windowing}
+\begin{itemize}
+    \item Window Size (25ms)\\
+    This defines the time of every frame of time used to calculate spectral features. A 25 ms window provides enough temporal information for speech without at the same time being too local (i.e. less than 25 ms).
+    \item Stride \\
+    The hop length of 10 ms allows for overlapping frames, which ensures smooth transitions between consecutive feature vectors, capturing fine temporal details.
+\end{itemize}
+
+\textbf{Mel-Frequency Features (80 Bin)}
+\begin{itemize}
+    \item Extracting 80 mel-frequency features allows for a small size yet expressive representation of the audio signal focusing on perceptually relevant frequencies for human speech.
+    \item The number of bins balances between resolution and model complexity.
+\end{itemize}
+
+\textbf{Logarithmic Scaling}
+\begin{itemize}
+    \item Applying a logarithmic transformation to the mel-spectrogram simulates the human auditory system's detection of sound intensity, which makes the features more meaningful for ASR models.
+    \item This has the additional advantage of reducing problems with dynamic range in the spectrogram.
+\end{itemize}
+
+\textbf{Dithering}
+\begin{itemize}
+    \item Adding small random noise helps to avoid numerical instability in computations - especially if one is working with very small values or zero-padding in the spectrogram.
+\end{itemize}
+
+\subsubsection{Spectrogram Augmentation}
+The model’s overall performance is improved by adding spectrogram augmentation as a way to modify the data. Here, the features of the input spectrogram are modified by means of time masking , frequency masking , and time warping . To apply time masking, consecutive periods on the spectrogram are set to zero, yet for frequency masking, it is the continuous frequency lines that are masked. Also, bending time adds non-adjustable changes to the time axis in the spectrogram by moving it along a smooth curve, much like changes in a person’s speaking rhythm. With these changes, the model works on features that are robust to acoustic variables, for example, faster speech, altered background noise, or sudden pitch changes. Augmentation with spectrograms in training prevents the Conformer from becoming attached to individual sound patterns and makes it more ready for handling a wide range of noises.
+
+\subsubsection{Convolutional Subsampling}
+In the stage of convolutional subsampling, Conformer is particularly useful for ASR tasks because input speech audio sequences can be very long and processing them is heavy computationally. Subsampling mainly seeks to lower the time frame of the input data without losing important details. ASR often works with Mel-spectrograms that are created at a rate of 10 milliseconds each frame. But working on such sequences straight away is inefficient because several of them have redundant neighboring frames. So, the sequence was subsampled through convolutional networks, decreasing the time resolution of each frame from 10ms to 40ms. Using strided convolution or pooling, the compression makes the model work more efficiently and achieve the same results. For example, the first stride of 2 in the convolution halves the size of the sequence to 6 samples and the resolution becomes 20ms. A second stride of 2 gives a sequence of 3 samples and 40ms resolution. By using these two steps, the sequence is compressed properly while keeping the main elements of the audio quality.
+
+While frames separated by 10ms include a lot of details, this level of detail is usually not important for further use in the speech processing. The model pays attention to important patterns for recognition when data is subsampled to 40ms. Moreover, computational costs are greatly reduced because each layer of the Conformer gets smaller input vectors by working on trimmed parts of the sequences.
+
+
+% Progressive Downsampling
+% \subsubsection{Progressive Downsampling}
+% In Automatic Speech Recognition (ASR), progressive downsampling works by making the time resolution lower in the input features but keeping necessary details needed for transcription. It includes lowering the number of dimensions in the feature data as it passes through layers in a deep neural network like a convolutional or transformer-based model to find patterns in speech. When downsampling is applied at several layers, the model reduces the length of the input sequence which quickens calculation and also saves memory, yet crucial parts of the audio and words are retained. Balancing the model’s accuracy and how fast it runs, low-resolution features help by recognizing phonemes or words in the speech.
+% Yesko Formula cha
+% \begin{equation}     
+% yt = f\left( \sum{i=0}^{k-1} wi \cdot x{t-s+i} \right) 
+% \end{equation}
+
+\subsubsection{Linear}
+
+Conformer uses a linear layer in the model after the first process of convolutional subsampling to map the newly subsampled features into a larger space. This step is required because it brings the feature dimensions to the size of the hidden layers used by Transformer and convolutional modules. To explain this, the linear block picks the results from the downsampling, which lowers the time resolution and extracts local details, and completes the process by adding an extra layer to increase its dimensions. Doing this makes sure the achieved representation is able to hold detailed acoustic details and blends well with the self-attention and feed-forward modules from the Conformer design. This kind of design gives a balance between performance and calculations, helping the Conformer perform well in speech recognition.
+
+\subsubsection{Dropout}
+
+The dropout layer is put in place after the linear transformation that occurs after convolutional subsampling. This is very significant as it helps the model avoid complications during training. It reports that, by setting a percentage of the input tensor to zero randomly, dropout helps the learning process become a bit random. For this reason, the model must use all kinds of inputs, forming robust and generalized acoustic representations. This way of controlling overfitting matters, because speech data has many dimensions and the Conformer model includes both convolution and Transformers. Applying dropout in training guarantees steady and effective results for big speech recognition systems.
+
+In the inference part, dropout is not utilized, so the model can use all its data to make predictions. Combining dropout with the Conformer’s design approach lets the architecture handle both performance and generalization to reach excellent results in automatic speech recognition
+
+\subsubsection{Conformer Encoder}
+\textbf{Conformer Architecture}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[scale=1]{Image PDFs/ASR/ASR-ConformerBlock.drawio.pdf}
+        \caption{Conformer Architecture}
+    \end{figure}
+
+\textbf{Feed Forward Module}
+
+The Conformer architecture requires the Feed Forward Module to deal with features at single-token level. It includes two FFNs that work in the same way, one before and one after the focus on attention and convolutional techniques. They function as processes before and after training to boost the model’s ability to learn features and still use few resources. All FFNs include certain layers in their structure: layer normalization, transformations, activation, and residual connections.
+
+All FFNs start off with layer normalization , ensuring that the mean and variance of the input are stable. In doing this step, the inputs to the next layers become more controlled, making the whole training process more stable. Once the module is normalized, it goes on to use a linear transformation followed by a non-linear GeLU or ReLU function. This way, the model can represent situations that are not simple, but more complex. After the activation, the results are passed through a linear layer that reshapes them to the original number of features. To sum up, residual connections enable gradients to continue, making sure issues like vanishing gradients are not a problem during training.
+
+\textbf{Multi-Headed Self Attention Module}
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-MultiHeadedSelfAttentionModule.drawio.pdf}
+        \caption{Block Diagram of Multi-Headed Self Attention Module Architecture}
+    \end{figure}
+
+\textbf{Multi-Head Self Attention with Relative Positional Embedding}
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[scale=1]{Image PDFs/ASR/ASR-ResMHA.drawio.pdf}
+        \caption{Block Diagram of Multi-Head Self Attention with Relative Positional Embedding}
+    \end{figure}
+
+% \textbf{Linear Projections}\\
+% Input embeddings $ {X} \in \mathbb{R}^{n \times d_{\text{model}}}$ are projected into queries ($ {Q}$), keys ($ {K}$), and values ($ {V}$) using learnable weight matrices for each head $i$:
+%     \begin{equation}
+%          {Q}_i =  {X}  {W}_i^Q, \quad
+%          {K}_i =  {X}  {W}_i^K, \quad
+%          {V}_i =  {X}  {W}_i^V
+%     \end{equation}
+
+% \textbf{Compute Attention Logits:}\\
+% Scaled dot-product attention logits are computed for each head $i$. For layer $l$, residual logits $ {R}_i^{l-1}$ from the previous layer are added:
+    
+% The residual term $ {R}_i^{l-1}$ propagates attention patterns from layer $l-1$ to $l$, promoting stability and reducing vanishing gradients. For $l = 1$, $ {R}_i^0 = 0$.
+    
+% \begin{equation}
+%     {A}_i^l = \frac{{Q}_i ({K}_i)^\top}{\sqrt{d_k}} + {R}_i^{l-1}
+% \end{equation}
+
+% \textbf{Attention Weights and Output}\\
+%     Attention weights $\boldsymbol{\alpha}_i$ are obtained via softmax, and the output for head $i$ is computed:
+%     \begin{equation}
+%         \boldsymbol{\alpha}_i = \text{softmax}( {A}_i^l), \quad
+%         \text{head}_i = \boldsymbol{\alpha}_i  {V}_i
+%     \end{equation}
+
+% \textbf{Multi-Head Concatenation:}\\
+% Outputs from $h$ heads are concatenated and projected:
+%     \begin{equation}
+%         \text{MultiHead}( {Q},  {K},  {V}) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)  {W}^O
+%     \end{equation}
+
+% \textbf{Add \& Normalize (Post-Attention):}\\
+%     A residual connection is applied, followed by Layer Normalization.
+%     Residual connections mitigate gradient degradation, while LayerNorm stabilizes training.
+%     \begin{equation}
+%          {Y} = \text{LayerNorm}( {X} + \text{MultiHead}( {Q},  {K},  {V}))
+%     \end{equation}
+
+% \textbf{Feed-Forward Network (FFN):}\\
+%     $ {Y}$ is processed by a position-wise FFN with ReLU activation:
+%     \begin{equation}
+%         \text{FFN}( {Y}) = \max(0,  {Y}  {W}_1 +  {b}_1)  {W}_2 +  {b}_2
+%     \end{equation}
+
+% \textbf{Add \& Normalize (Post-FFN):}\\
+%     Another residual connection and LayerNorm:
+%     \begin{equation}
+%          {Z} = \text{LayerNorm}( {Y} + \text{FFN}( {Y}))
+%     \end{equation}
+
+% \textbf{Store Residual Logits:}\\
+%     Attention logits $ {A}_i^l$ are stored as residuals for the next layer:
+    
+%     Storing $ {R}_i^l$ enables:
+%     \begin{itemize}
+%         \item Information flow across layers.
+%         \item Refinement of attention patterns (e.g., layer $l + 1$ can amplify/suppress prior patterns).
+%         \item Improved modeling of long-range dependencies.
+%     \end{itemize}
+    
+%     \begin{equation}
+%          {R}_i^l =  {A}_i^l
+%     \end{equation}
+
+\textbf{Convolution Module}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[scale=1]{Image PDFs/ASR/ASR-Convolution Module.drawio.pdf}
+        \caption{Block Diagram of Convolution Module}
+    \end{figure}
+    \begin{enumerate}
+        \item \textbf{Pointwise Convolution}
+
+        Part of the convolutional modules makes use of pointwise convolution to reorganize feature representations efficiently. A pointwise convolution also known as 1x1 convolution works by running a convolutional filter over all input channels with a kernel size of 1. In Conformer, time is what is being transformed in the temporal dimension of the speech features. One of the main uses of pointwise convolution is to keep the input’s spatial or temporal features while transforming it to a different dimension. 
+        
+        With pointwise convolutions, the Conformer saves computations and improves model performance, since it skips costly spatial computations.
+
+        \item \textbf{GLU Activation}
+
+        The GLU activation function is added to bring non-linearity and make the features better represented. The input is separated into two pieces, and the “gate” part gets processed by a sigmoid function, then those values are multiplied with the remaining data. Because of gating, the model can control information being exchanged and give more attention to significant elements as needed. By using GLU on the feed-forward and convolutional layers in the Conformer increases the ability to represent speech data while maintaining a good balance between simplicity and complexity.
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=\linewidth]{Image PDFs/ASR/glu_activation.png}
+            \caption{Graph of GLU activation}
+        \end{figure}
+        
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-GLU.drawio.pdf}
+            \caption{Block Diagram of GLU activation}
+        \end{figure}
+        
+        
+        \item \textbf{1D depthwise convolution}
+
+        The Conformer designs 1D depthwise convolution to catch the connections between parts of speech by filtering each channel in sequence along the time axis. Consequently, resources are saved without losing the following local features. It combines pointwise convolution to help channels connect, thus it works well for modeling features in successive speech.
+
+        \item \textbf{Swish Activation}
+
+        The Swish activation function is well known in deep learning since it performs better than simpler activation functions like ReLU (Rectified Linear Unit). Swish is useful in the Conformer architecture because it boosts both the strength and speed of training for automatic speech recognition tasks.
+        Swish is defined as:
+        \begin{equation}
+            \text{Swish}(x) = x \cdot \sigma(x)
+        \end{equation}
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=\linewidth]{Image PDFs//ASR/swish_activation.png}
+            \caption{Graph of Swish Activation}
+        \end{figure}
+
+    \end{enumerate}
+    
+\textbf{Layer Normalization}\\
+The purpose of Layer Normalization is to keep the training stable and speedy by normalizing the activations in all layers. To be clear, it standardizes each input value in every feature dimension (the hidden dimension) for each step. This lets the mean and variance of the activations not change, so problems with vanishing or exploding gradients are avoided. It is applied in many places in the network to make sure the gradients do not experience fluctuations. As internal covariate shift is limited, the model performs better at obtaining strong features from speech data, seen mainly in deep networks with lots of layers. This method becomes crucial for reaching consistent and efficient convergence in automatic speech recognition. 
+
+\textbf{Conformer Block Computation}\\
+Our proposal for Conformer includes putting the Multi-Headed Self-Attention and the Convolution modules between two Feed Forward modules. Macaron-Net \cite{macaron} was a motivation behind this sandwich structure, and it suggests removing the regular feed-forward layer from a normal Transformer block and placing two reduced-size feed-forward layers, one before and another after the attention layer. Like in Macron-Net, we add half-step residual weights to the feed-forward (FFN) parts of our model. The second feed-forward module comes ahead of the last layernorm layer. In math terms, yi is the output produced by Conformer block i as it takes input xi as input.
+     
+Mathematically, this means that for input $x_i$ to a Conformer block $i$, the output $y_i$ of the block is:
+    \begin{align}
+    \tilde{x}_i &= x_i + \frac{1}{2} \text{FFN}(x_i) \\
+    x'_i &= \tilde{x}_i + \text{MHSA}(\tilde{x}_i) \\
+    x''_i &= x'_i + \text{Conv}(x'_i) \\
+    y_i &= \text{LayerNorm}\left(x''_i + \frac{1}{2} \text{FFN}(x''_i)\right)
+    \end{align}
+
+\subsubsection{SentencePiece Tokenizer}
+Sentence Piece is a language-neutral subword tokenisation system that is actively used in end-to-end automatic speech recognition (ASR) systems to alleviate vocabulary sparsity and out-of-vocabulary (OOV) effects. SentencePiece is unlike tokenisers, which rely on whitespace, and works on an unsegmented stream of Unicode characters, where subword units are directly learned from the input. It is therefore especially beneficial when dealing with languages that do not have clear word delimiting boundaries and with infrequent or misspelt words in speech transcripts. The framework incorporates the use of either the Byte-Pair Encoding (BPE) as the base algorithms and thus enables one to trade-off the granularity of tokens and the general model performance. SentencePiece produces strong, compact representations, operating on a subset of corpora coded uniformly and reversibly into subword tokens, such as special symbols marking the start and end of an utterance, and these representations are compatible with the output of acoustic models in modern ASR pipelines.
+
+\begin{algorithm}[H]
+	\caption{Train SentencePiece Tokenizer (BPE)}
+	
+	\textbf{Input:} Raw training text, target vocabulary size, model type (BPE), special tokens \\
+	\textbf{Output:} Trained tokenizer model, subword vocabulary, encoding and decoding rules
+	
+	1. Preprocess the training text by normalizing whitespace and optionally adding sentence boundary markers\;
+	
+	2. Initialize a character-level vocabulary using all unique Unicode symbols present in the text\;
+	
+	3. Add predefined special tokens (e.g., \texttt{<s>}, \texttt{</s>}, \texttt{<unk>}) to the vocabulary\;
+	
+	4. If the model type is BPE:
+	\begin{itemize}
+		\item Initialize all characters as individual tokens
+		\item Convert the full text into a sequence of tokens based on the current vocabulary
+		\item Repeat until the target vocabulary size is reached:
+		\begin{itemize}
+			\item Count the frequency of all adjacent token pairs
+			\item Select the most frequent token pair
+			\item Merge the selected pair into a new subword token
+			\item Add the new token to the vocabulary
+			\item Replace all occurrences of the merged pair in the token sequence
+		\end{itemize}
+	\end{itemize}
+	
+	5. Save the learned vocabulary, subword merge rules, and model parameters\;
+	
+	6. Return the trained tokenizer capable of encoding and decoding arbitrary text sequences\;
+	
+\end{algorithm}
+
+\subsubsection{Connectionist Temporal Classification (CTC) Head}
+
+Connectionist Temporal Classification (CTC) is commonly used in sequence-to-sequence
+tasks such as speech recognition and handwriting recognition, where the input and
+output sequences are of different lengths and are not pre-aligned. CTC can be used
+both as a loss function during training and as a decoding strategy during inference.
+
+CTC introduces a special \emph{blank symbol}, typically denoted as \( b \), which
+allows the model to emit either an output symbol \( y_t \) or a blank at each time
+step of the input sequence.
+
+Let the input sequence be
+\begin{equation}
+	\mathbf{x} = (x_1, x_2, x_3, \dots, x_T),
+\end{equation}
+where \( T \) denotes the input sequence length, and let
+\begin{equation}
+	\mathbf{y} = (y_1, y_2, \dots, y_U)
+\end{equation}
+be the target output sequence.
+
+CTC defines a collapsing function \( \mathcal{B} \) that removes repeated symbols
+and blank symbols. The set of all alignment paths that collapse to \( \mathbf{y} \)
+is denoted by
+\begin{equation}
+	\mathcal{B}^{-1}(\mathbf{y}).
+\end{equation}
+
+\textbf{CTC Objective}
+
+The conditional probability of the output sequence \( \mathbf{y} \) given the input
+sequence \( \mathbf{x} \) is defined as
+\begin{equation}
+	P(\mathbf{y} \mid \mathbf{x}) =
+	\sum_{\boldsymbol{\pi} \in \mathcal{B}^{-1}(\mathbf{y})}
+	P(\boldsymbol{\pi} \mid \mathbf{x}),
+\end{equation}
+where \( \boldsymbol{\pi} = (\pi_1, \pi_2, \dots, \pi_T) \) represents an alignment path.
+
+Each alignment probability is factorized over time steps as
+\begin{equation}
+	P(\boldsymbol{\pi} \mid \mathbf{x}) =
+	\prod_{t=1}^{T} P(\pi_t \mid \mathbf{x}),
+\end{equation}
+with
+\begin{equation}
+	\pi_t \in \mathcal{Y} \cup \{ b \},
+\end{equation}
+where \( \mathcal{Y} \) is the output vocabulary and \( b \) denotes the blank symbol.
+
+The summation over all valid alignments is efficiently computed using dynamic
+programming techniques such as the forward--backward algorithm.
+
+\textbf{Inference}
+
+During inference, the output sequence is simplified by collapsing consecutive
+repeated symbols and removing blank symbols. For example,
+\begin{equation}
+	\texttt{h\_l\_l\_o} \;\longrightarrow\; \texttt{hello}.
+\end{equation}
+
+\textbf{Comparison with Attention-Based Methods}
+
+Unlike attention-based models that perform global alignment between input and output
+sequences, CTC performs alignment locally at each time step. This local alignment
+strategy avoids scanning the entire sequence during decoding, leading to improved
+computational efficiency, especially for long input sequences.
+
+
+\subsubsection{Beam Search Decoder}
+In non-streaming ASR systems, once the features of a whole audio input are processed by the encoder-decoder model, the final step is to generate the most likely transcription. Instead of selecting the highest-probability word at each step(greedy decoding), this project utilizes the Beam Search decoding algorithm to improve the contextual accuracy of the output.
+
+Beam search is an approximate search method that visits the multiple possible output sequences parallely. It is a way to try many possible word sequences at the same time. It keeps the top k best guesses at each step. Then it looks at all the possible next words for each guess and keeps only the best k sequences based on their total probability.
+
+\begin{equation}
+\hat{Y} = \arg\max_{Y \in \mathcal{B}} \log P(Y \mid X)
+\end{equation}
+
+\textbf{Where:}
+\begin{itemize}
+    \item $\hat{Y}$ is the final predicted output sequence.
+    \item $X$ is the input (e.g., audio features).
+    \item $Y$ is a candidate output sequence.
+    \item $\mathcal{B}$ is the set of top $k$ hypotheses maintained at each step (beam size).
+    \item $P(Y \mid X)$ is the conditional probability of the sequence $Y$ given input $X$.
+\end{itemize}
+
+\subsubsection{AdamW Optimizer}
+AdamW is an improvement over the traditional Adam optimizer, as it decouples the
+weight decay term from the gradient-based parameter updates, thereby enabling more
+effective regularization. This property is particularly beneficial when training
+large-scale deep learning models such as FastConformer, a highly efficient variant
+of the Conformer architecture used in speech recognition.
+
+In the standard Adam formulation, weight decay is applied through L2 regularization
+of the loss, which can interfere with the adaptive learning-rate mechanism. AdamW
+addresses this limitation by applying weight decay directly to the model parameters
+after the Adam update step, as shown in the following equation:
+
+\begin{equation}
+	\theta_{t+1} = \theta_t
+	- \eta \left( \frac{\hat{m}_t}{\sqrt{\hat{v}_t} + \epsilon} \right)
+	- \eta \lambda \theta_t
+\end{equation}
+
+where \( \theta_t \) represents the model parameters at training step \( t \),
+\( \eta \) is the learning rate, \( \hat{m}_t \) and \( \hat{v}_t \) are the
+bias-corrected first and second moment estimates, respectively, and \( \lambda \)
+denotes the weight decay coefficient.
+
+In architectures such as FastConformer, which combine convolutional and
+self-attention layers, training stability and generalization are critical. By
+providing cleaner and more consistent regularization, AdamW typically leads to
+better convergence behavior and improved generalization compared to the standard
+Adam optimizer, especially when training transformer-based models with large batch
+sizes and long input sequences.
+
+\subsubsection{Noam Annealing}
+
+Noam annealing is a learning-rate scheduling strategy introduced in
+\emph{Attention Is All You Need} by Vaswani et al.~(2017) for training Transformer
+models. The schedule is specifically designed to complement adaptive optimizers
+such as Adam by avoiding the need for conventional learning-rate decay schemes.
+
+The Noam schedule combines an initial linear warmup phase with an inverse square
+root decay, defined as:
+
+\begin{equation}
+	\text{lr}(t) = d_{\text{model}}^{-0.5}
+	\cdot
+	\min\left(
+	t^{-0.5},\;
+	t \cdot \text{warmup\_steps}^{-1.5}
+	\right)
+\end{equation}
+
+where \( t \) denotes the current training step,
+\( d_{\text{model}} \) is the model dimensionality (e.g., embedding size), and
+\( \text{warmup\_steps} \) is a predefined hyperparameter.
+
+During the warmup phase, the learning rate increases linearly with the training
+steps, which helps stabilize optimization when parameters are randomly initialized.
+After the warmup period, the learning rate decays proportionally to \( t^{-0.5} \),
+allowing for smoother convergence and improved generalization.
+
+Noam annealing provides stable optimization dynamics in architectures such as
+FastConformer that rely heavily on self-attention and convolutional blocks. When
+combined with optimizers like Adam or AdamW, this scheduling strategy effectively
+balances rapid initial learning with gradual refinement, making it a widely adopted
+choice for transformer-based speech and language models.
+
+
+\subsubsection{LM Fusion}
+LM fusion works by adding a language model trained separately to improve how the machine transcribes what is spoken. An acoustic model is used in traditional ASR to make the audio into phonetic or word sequences and the language model adds extra knowledge, like grammar and word chances, to make the result clearer. LM fusion fuses different models, often applying shallow fusion, deep fusion or cold fusion. Shallow fusion works by combining the scores from the LM with the output from the ASR during the decoding stage, most often with log-linear techniques. In deep fusion, the LM’s hidden states join with the features in the ASR encoder and cold fusion trains the ASR model alongside a pre-trained LM to make their representations match. The LM makes it possible to understand longer and complex sentences which decreases mistakes in confusing or poor-quality audio and gives a better overall result.
+
+\subsubsection{Softmax Function}
+Softmax function helps convert raw logits from the output layer into a distribution of probabilities for the target vocabulary. This means the model creates probabilities for every output token (such as phonemes, characters or words) and, during decoding, it can pick the most likely sequence.
+
+\begin{equation}
+\text{softmax}(z_i) = \frac{e^{z_i}}{\sum_{j=1}^{K} e^{z_j}}
+\end{equation}
+
+\begin{itemize}
+  \item \( z_i \): The input score (logit) for class \( i \)
+  \item \( z_j \): The input score (logit) for class \( j \)
+  \item \( K \): The total number of classes
+\end{itemize}
+
+\subsubsection{Word Error Rate (WER)}
+Word Error Rate (WER) is the most popular metric used to evaluate the performance of the Automatic Speech Recognition (ASR) systems. It is used to measure the accuracy of transcription by comparing the hypothesis of the system to a ground-truth reference transcript.
+
+
+\begin{equation}
+	\text{WER} = /frac{S+D+I}{N}
+\end{equation}
+
+where,
+\begin{itemize}
+	\item S = Number of substitutions (wrong words)
+	\item D = Number of deletions (missing words)
+	\item I = Number of insertions (extra words)
+	\item N = Total number of words in the reference
+\end{itemize}
+

@@ -1,0 +1,30 @@
+\contentsline {figure}{\numberline {3-1}{\ignorespaces Validation WER Graph\relax }}{10}{figure.caption.4}%
+\contentsline {figure}{\numberline {4-1}{\ignorespaces Proposed System Architecture\relax }}{12}{figure.caption.5}%
+\contentsline {figure}{\numberline {4-2}{\ignorespaces Proposed Architecture of ASR\relax }}{13}{figure.caption.6}%
+\contentsline {figure}{\numberline {4-3}{\ignorespaces Conformer Architecture\relax }}{17}{figure.caption.7}%
+\contentsline {figure}{\numberline {4-4}{\ignorespaces Block Diagram of Multi-Headed Self Attention Module Architecture\relax }}{18}{figure.caption.8}%
+\contentsline {figure}{\numberline {4-5}{\ignorespaces Block Diagram of Multi-Head Self Attention with Relative Positional Embedding\relax }}{19}{figure.caption.9}%
+\contentsline {figure}{\numberline {4-6}{\ignorespaces Block Diagram of Convolution Module\relax }}{20}{figure.caption.10}%
+\contentsline {figure}{\numberline {4-7}{\ignorespaces Graph of GLU activation\relax }}{21}{figure.caption.11}%
+\contentsline {figure}{\numberline {4-8}{\ignorespaces Block Diagram of GLU activation\relax }}{22}{figure.caption.12}%
+\contentsline {figure}{\numberline {4-9}{\ignorespaces Graph of Swish Activation\relax }}{23}{figure.caption.13}%
+\contentsline {figure}{\numberline {4-10}{\ignorespaces Proposed Architecture Of Small Language Model\relax }}{31}{figure.caption.14}%
+\contentsline {figure}{\numberline {4-11}{\ignorespaces Block Diagram of Decoder Architecture\relax }}{34}{figure.caption.15}%
+\contentsline {figure}{\numberline {4-12}{\ignorespaces Query Key Value Projection\relax }}{35}{figure.caption.16}%
+\contentsline {figure}{\numberline {5-1}{\ignorespaces Raw Audio Waveform\relax }}{45}{figure.caption.22}%
+\contentsline {figure}{\numberline {5-2}{\ignorespaces Mel Spectrogram Of Raw Audio\relax }}{45}{figure.caption.23}%
+\contentsline {figure}{\numberline {5-3}{\ignorespaces Log Mel Spectrogram\relax }}{46}{figure.caption.24}%
+\contentsline {figure}{\numberline {5-4}{\ignorespaces Spec Augmentation with Frequency Mask = 20\relax }}{46}{figure.caption.25}%
+\contentsline {figure}{\numberline {5-5}{\ignorespaces Spec Augmentation with Time Mask = 20\relax }}{47}{figure.caption.26}%
+\contentsline {figure}{\numberline {5-6}{\ignorespaces Spec Augmentation with Time Warp = 20\relax }}{47}{figure.caption.27}%
+\contentsline {figure}{\numberline {5-7}{\ignorespaces Spec Augmentation with Time Warp, Frequency and Time Masking = 20\relax }}{48}{figure.caption.28}%
+\contentsline {figure}{\numberline {5-8}{\ignorespaces Token and Positional Embedding\relax }}{57}{figure.caption.33}%
+\contentsline {figure}{\numberline {5-9}{\ignorespaces Attention Mechanism\relax }}{58}{figure.caption.34}%
+\contentsline {figure}{\numberline {6-1}{\ignorespaces Epoch-wise Training Loss\relax }}{64}{figure.caption.37}%
+\contentsline {figure}{\numberline {6-2}{\ignorespaces Epoch Wise Validation Loss\relax }}{64}{figure.caption.38}%
+\contentsline {figure}{\numberline {6-3}{\ignorespaces Best Validation Loss (Cumulative Minimum)\relax }}{65}{figure.caption.39}%
+\contentsline {figure}{\numberline {6-4}{\ignorespaces Gradient Norm per Epoch\relax }}{65}{figure.caption.40}%
+\contentsline {figure}{\numberline {6-5}{\ignorespaces BLEU Score\relax }}{68}{figure.caption.41}%
+\contentsline {figure}{\numberline {6-6}{\ignorespaces BLEU Score\relax }}{69}{figure.caption.42}%
+\contentsline {figure}{\numberline {6-7}{\ignorespaces BLEU vs ROUGE scores for different n-grams\relax }}{70}{figure.caption.44}%
+\contentsline {figure}{\numberline {8-1}{\ignorespaces Gantt Chart\relax }}{74}{figure.caption.46}%

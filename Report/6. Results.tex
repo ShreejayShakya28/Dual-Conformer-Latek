@@ -1,0 +1,208 @@
+\newpage
+\section{\MakeUppercase{Result and Analysis}}
+	
+\subsection{ASR}
+\subsubsection{Word Error Rate (WER) Comparison and Analysis}
+The fine-tuned model has only 13.2 million parameters, which is about 4x to 8x times fewer than smaller architectures (e.g., Conformer-M, ~50 million parameters) and larger ones (e.g., DeepSpeech 2, ~110 million parameters). This compactness makes the architecture very compatible with edge devices and low-latency applications. The encoder is 98.6\% of the total number of parameters, meaning that it washes up all the model capacity, the decoder is insignificant, consisting of only 181K  parameters. This distribution is consistent with CTC based structures that avoid the use of complicated auto-regressive decoders, which limit both memory size and inference complexity.
+
+The achieved WER of 6.14\% per cent is higher than the performance of higher-ranking models, most of which use three to eight times the number of parameters and large amounts of data augmentation, nevertheless, it is a strong performance-per-parameter trade-off. In the case of a situation where constraints in model size, power consumption, or real-time response are involved, the existing model provides a realistically compromised state. The use of a CTC-BPE hybrid output scheme avoids the use of outside language models during decoding, which simplifying the scheme, rather than the many transducer or attention-based models, retains a reasonable degree of sub-word level generalization.
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{|l|c|c|}
+		\hline
+		\textbf{Model} & \textbf{WER} & \textbf{Parameters} \\
+		\hline
+		Deep Speech 2 & 5.33 & 110M \\
+		Gated ConvNets & 4.8 & 100M \\
+		Seq-to-Seq Attention (LSTM Based) & 3.82 & 50M--100M \\
+		Convolution Speech Recognition & 3.26 & 30M--70M \\
+		wav2vec-wav2letter & 2.7 & 30M / 50M \\
+		Transformer & 2.6 & 60M--100M \\
+		Squeezeformer (L) & 2.47 & 50M \\
+		LSTM Transducer & 2.23 & 40M--80M \\
+		Conformer (M) & 2.0 & 50M \\
+		Stateformer & 1.76 & 40M--60M \\
+		Our Model & 6.14 & 13.2M \\
+		\hline
+	\end{tabular}
+	\caption{Word Error Rate (WER) and parameter count of models trained on the LibriSpeech dataset}
+	\label{tab:wer_librispeech_models}
+\end{table}
+
+\subsubsection{Qualitative Analysis}
+To illustrate examples of model predictions on held-out utterances, below there are three representative samples, each paired with its ground-truth reference, the model’s hypothesis, and the corresponding Word Error Rate (WER):
+
+
+\begin{tabularx}{\linewidth}{X X c}
+	\hline
+	\textbf{Reference} & \textbf{Hypothesis} & \textbf{WER} \\
+	\hline
+	ON THE SIXTH OF APRIL EIGHTEEN THIRTY THE CHURCH OF JESUS CHRIST OF LATTER DAY SAINTS WAS FORMALLY ORGANIZED AND THUS TOOK ON A LEGAL EXISTENCE &
+	on the sixth of april eighteen thirty the church of jesus christ of later saints was formerly organized and thus took on a legal existence &
+	0.11 \\
+	\hline
+	ITS ORIGIN WAS SMALL A GERM AN INSIGNIFICANT SEED HARDLY TO BE THOUGHT OF AS LIKELY TO AROUSE OPPOSITION &
+	its origin was small a germ an insignificant seed hardly to be thought of as likely to arouse opposition &
+	0.0 \\
+	\hline
+	INSTEAD OF BUT SIX REGULARLY AFFILIATED MEMBERS AND AT MOST TWO SCORE OF ADHERENTS THE ORGANIZATION NUMBERS TODAY MANY HUNDRED THOUSAND SOULS &
+	instead of but six regularly affiliated members and at most two score of adherents the organization numbers to day many hundred thousand souls &
+	0.09 \\
+	\hline
+\end{tabularx}
+
+These examples demonstrate that the model accurately captures most of the semantic content. Errors are primarily lexical (e.g., “latter” vs. “latter day”, “to day” vs. “today”) or morphological, which are common in CTC-based systems without external language models. Notably, the model achieves perfect transcription on complex formal language in the second example, highlighting its robustness on well-articulated speech
+
+\subsubsection{Training Dynamics}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/EpochTrain_Loss.png}
+	\caption{Epoch-wise Training Loss}
+\end{figure}
+
+Training Loss (Figure 6-1) decreases steadily from 36.2 to 31.2, indicating consistent learning.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/EpochVal_Loss.png}
+	\caption{Epoch Wise Validation Loss}
+\end{figure}
+Validation Loss (Figure 6-2) shows a similar downward trend, reaching 37.9 at epoch 7, with only minor fluctuations (e.g., a small uptick at epoch 5), suggesting good generalization without severe overfitting.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/BestVal_Loss.png}
+	\caption{Best Validation Loss (Cumulative Minimum)}
+\end{figure}
+The Best Validation Loss (Figure 6-3) is monotonically non-increasing, confirming that the best checkpoint improves over time.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/EpochGradient_Norm.png}
+	\caption{Gradient Norm per Epoch}
+\end{figure}
+The Gradient Norm (Figure 6-4) drops rapidly in early epochs and stabilizes around 180–185, signaling convergence and stable optimization. Collectively, these curves confirm a stable, well-behaved training process with no signs of divergence or instability.
+
+\subsection{LLM}
+\subsubsection{Inference}
+\textbf{Before Training}
+\begin{itemize}
+    \item \textbf{Input text:} What type of cloud is typically associated with thunderstorms?
+    \item \textbf{Output:} What type of cloud is typically associated with thunderstorms? imaginaryonetolution Mortgage TT remember gard ACTIONSussedOND repeEdge Storage severerelease
+\end{itemize}
+
+\textbf{After loading weights}
+\begin{itemize}
+    \item \textbf{Input text:} What type of cloud is typically associated with thunderstorms?
+    \item \textbf{Output:} What type of cloud is typically associated with thunderstorms? Why did lightning get it going down in Oklahoma?" What sort of cloud was seen on September 19 that led to reports
+\end{itemize}
+
+\textbf{After instruction finetuning}
+\begin{verbatim}
+Below is an instruction that describes a task. Write a response that 
+appropriately completes the request.
+Rewrite the sentence using a simile.
+### Input:
+The car is very fast.
+Correct response:
+>> The car is as fast as lightning.
+Model response:
+>> The car is as fast as a bullet.
+-------------------------------------
+Below is an instruction that describes a task. Write a response 
+that appropriately completes the request.
+### Instruction:
+What type of cloud is typically associated with thunderstorms?
+Correct response:
+Model response:
+>> The type of cloud associated with thunderstorms is a cumulus cloud.
+-------------------------------------
+Below is an instruction that describes a task. Write a response 
+that appropriately completes the request.
+### Instruction:
+Name the author of 'Pride and Prejudice'.
+Correct response:
+>> Jane Austen.
+Model response:
+>> The author of 'Pride and Prejudice' is Jane Austen.
+\end{verbatim}
+
+\subsubsection{Evaluation Metrics}
+\textbf{BLEU Score Analysis}\\
+BLEU is a common metric to evaluate machine‐generated text with one or more
+reference texts. A single BLEU score calculates precision where zero being the worst and
+one being perfect. Typically for NLP tasks, a BLEU4 score of at least 0.4 is
+considered good, while a score of 0.6 and higher is exceptional. The comparative analysis of the performance regarding our model shows a relatively low score of 0.3061 for BLEU-4 and 0.45 for BLEU-1 score.
+
+The BLEU-1 score checks for only single word overlaps while the BLEU-2 and higher grams look for matches of 2,3 and 4 word sequences respectively. These are obviously harder to match as generated text doesn't use the same phrasing as the reference texts. This is the reason we see a drop from .45 to .3061 from BLEU-1 to BLEU-4. The descending slope in the graph confirms that matching long sequences is tougher. %Shorter outputs reduce the
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Image PDFs/blue.png}
+    \caption{BLEU Score}
+\end{figure}
+
+\textbf{ROUGE Score Analysis}\\
+ROUGE score is another evaluation metric used for NLP and text-generation related tasks. There are various ROGUE metrics like ROUGE-N, ROUGE-L etc. ROUGE-L evaluates the similarity between generated and reference text based on the length of their Longest Common Subsequence (LCS).
+
+\begin{itemize}
+    \item \textbf{Precision (0.5965)}
+        \begin{itemize}
+            \item About 59.65\% of the words that are generated appeared also within the reference in correct order.
+            \item High precision indicates the text has correct information but could miss some parts of the reference.
+        \end{itemize}    
+    \item \textbf{Recall (0.6256)}
+        \begin{itemize}
+            \item About 62.56\% of the reference text is covered by the generated text
+            \item Higher recall indicates the generated text covers most of the reference text
+        \end{itemize}   
+    \item \textbf{F1 (0.5862)}
+        \begin{itemize}
+            \item The F1 score balances the precision and recall
+            \item Here the 58.62\% means that the generated text is moderately good in terms of the coverage and correctness when it is compared with reference text
+        \end{itemize}
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Image PDFs/rouge.png}
+    \caption{BLEU Score}
+\end{figure}
+
+\textbf{Evaluation Metrics Table}
+
+\begin{table}[H]
+    \centering
+    \caption{Evaluation Metrics}
+    \begin{tabular}{|l|l|}
+        \hline
+        Metric & Value\\
+        \hline
+        Masked Loss & 0.6722 \\
+        Perplexity & 1.96\\
+        BERTScore F1 & 0.9303\\
+        ROUGE-L & 0.5862\\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{BLEU vs ROUGE Score}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/blueVsRouge.png}
+	\caption{BLEU vs ROUGE scores for different n-grams}
+\end{figure}
+
+The scatter plot compares BLEU and ROUGE-F1 scores across three metrics:
+BLEU-1 vs. ROUGE-1 (red), BLEU-2 vs. ROUGE-2 (blue), and BLEU-4 vs. ROUGE-L (green). Overall, there is a positive correlation, higher BLEU scores means higher ROUGE scores.
+
+\textbf{Upward Sloping trend}
+
+Each cluster shows an upward trend, which shows the model performing well in BLEU(n-gram precision) also tends to perform well in ROUGE. Points near the diagonal typically show a system where both metrics are balanced. Points above the diagonal indicate a higher ROUGE Score than a BLEU score meaning the model prioritizes concise but incomplete outputs. Similarly, points below the diagonal indicate a higher BLEU score than ROUGE SCORE indicating the model focuses more on recall rather than precision.
+
+\textbf{Differences Among the Clusters}
+
+The orange cluster (BLEU-1 vs. ROUGE-1) is tightly aligned, as both focus on unigram overlap. The blue cluster (BLEU-2 vs. ROUGE-2) shows more variation, reflecting sensitivity to bigram accuracy. The green cluster (BLEU-4 vs. ROUGE-L) is the most dispersed because BLEU-4 requires strict 4-gram matches, whereas ROUGE-L checks the longest
+common subsequence which might not align perfectly with exact four-gram overlap.
+

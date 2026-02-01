@@ -1,0 +1,48 @@
+\newpage
+\section{\MakeUppercase{Requirement Analysis}}
+
+\subsection{Project Requirements}
+
+\subsubsection{Hardware requirements}
+\textbf{Google Colab}\\
+It is a lightweight and inexpensive option to train our models and has access to high-performance GPUs including the NVIDIA T4 or P100, multi-core CPU and up to 12GB of RAM on the free plan. The precise hardware setup also depended on the availability of resources but the real-time management of hardware as well as the smooth connection with Google Drive made Colab a good option to take into consideration of our computational requirements. Colab allows us to access the free resources to do lightweight tasks that featured premium GPUs, longer runtimes, and larger memory allocations depending on the requirement. It also allows to suspend or cancel sessions when they were idle in order to optimize cost so that the available compute hours are not wasted. 
+
+\subsubsection{Software requirements}
+\textbf{PyTorch}\\
+PyTorch is a widely used machine learning library which was developed by Facebook’s AI research lab (FAIR). During the building and testing of deep learning models, it shines due to its ease of use. It works well with python and can run effectively with both CPUs and GPUs. It is also equipped with powerful tools like TorchVision, TorchText, and TorchAudio, making it easier to work in different areas of Artificial Intelligence. We used PyTorch’s dynamic computation graph and intuitive interface to rapidly prototype the ASR module’s key components, including the Residual Multi-head Attention (ResMHA) mechanisms , Connectionist Temporal Classification (CTC) loss function. For the language model, PyTorch’s native Transformer modules and attention masking capabilities  can be used to build the decoder only model and attention masking capabilities.
+
+\textbf{Numpy}\\
+NumPy serves a foundational package for numerical computation in python, supplying different types of powerful data structures such as multi-dimensional arrays and matrices, along with a large number of mathematical methods to operate on the arrays effectively. It has helped the building process of various models by supporting the computational backbone for all low-level tensor operation and data preprocessing tasks. We have heavily relied on NumPy’s optimized array operation for extracting features in our ASR system. It is heavily used when converting raw audio waveform into Mel Spectrograms through FFT and filter bank applications. During data augmentation, NumPy enabled fast spectrogram augmentation like time warping, time masking and frequency masking using its slicing and broadcasting features. 
+
+
+\textbf{Matplotlib}\\
+Matplotlib is a comprehensive plotting library in Python used for creating static, animated, and interactive visualizations. It provides a flexible and easy-to-use interface for generating a wide variety of plots, including line charts, bar graphs, histograms, scatter plots, and more. Matplotlib plays a crucial role in data exploration, model evaluation, and result interpretation by allowing users to visually analyze trends, patterns, and anomalies within their data. Matplotlib is used to visualize the spectrogram and its types and verifying and validating the spectrogram augmentation during the initial phase of dataset preparation. It integrates seamlessly with other Python libraries such as NumPy, Pandas, and SciPy, enabling efficient visualization of numerical data and statistical results. With its object-oriented API, Matplotlib supports both simple and highly customized visual outputs suitable for publication-quality figures or quick exploratory analysis ideal for project of our nature.
+
+\textbf{NeMo}
+
+NeMo is an open source toolkit created by NVIDIA to assemble, train, and fine tune state of the art conversational AI models. NeMo Fine-tuning a FastConformer model takes advantage of its modular ASR pipeline and, therefore, simplifies the steps in dataset preparation and configuration. It involves loading a pre-trained FastConformer checkpoint, changing the architecture or dataset parameters of a YAML configuration file, and running the training script. NeMo supports distributed training and mixed-precision arithmetic and allows popularising the model on new acoustic data with efficient optimisation.
+
+
+\subsection{Feasibility Analysis}
+
+\subsubsection{Technical Feasibility}
+The project being investigated includes an Automatic Speech Recognition (ASR) module along with a small language model. It requires huge libraries and two sets of datasets and architectural paradigms to implement. The technical requirements are quite high, but the availability of modules and libraries already built into the PyTorch ecosystem, along with the free availability of datasets, makes the project technically achievable. In early experiments in which the ASR component was trained directly, the training and validation loss curves showed a consistent decreasing trend and ostensibly a convergence, which is considered internal optimization. The accuracy of validation also showed steady increase, although to a small degree. However, Word Error Rate (WER) was consistently higher than 95\% an error rate that is significantly poorer than the 5-10\% WERs that might be seen with state-of-the-art models on the LibriSpeech corpus. This difference may indicate that despite minimizing the loss, the model is not generalizing to the correct transcription work. Therefore, it was considered to be unfeasible to continue with full-scale training of the ASR module considering the existing limitations of the computational capabilities and development schedule. We therefore decided to optimize an already trained ASR model, thus using the already developed linguistic and acoustic features to achieve a better performance by requiring significantly lower data and computational requirements.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/val_wer.jpg}
+	\caption{Validation WER Graph}
+\end{figure}
+
+\subsubsection{Economic Feasibility}
+The major cost includes paid online computing service such as Colab pro for training our custom conformer model and SLM. Other costs include printing and for other softwares and tools. Given the scale of the model and our dataset availability, the project is economic feasible in accordance to our proposed budget.
+
+\subsubsection{Schedule Feasibility}
+This project can be chunked down to phases starting from audio data pre-processing, training our custom conformer model to training our SLM. Due to our system being a modular independent pipelines, the training can be performed independently and integrated together allowing us with sufficient time to divide tasks. This allows us to ensure that milestones are achievable given the academic calendar schedule.
+
+
+
+% \subsection{Functional Requirements}
+
+% \subsection{Non-Functional Requirements}
+

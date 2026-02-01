@@ -1,0 +1,47 @@
+\newpage
+\section{\MakeUppercase{Introduction}}
+
+\subsection{Background}
+The application of voice-based interfaces range from transcription to customer service bots. Accurate speech-to-text conversion and understanding language in context aware manner are essential for implementation of these systems. However, building integrated ASR-LLM systems is complex, making it difficult to scale individual components for specific tasks.
+
+Automatic Speech Recognition (ASR) and Large Language Models (LLMs) are the basic foundational technologies for modern AI used for conversational AI. While the whole system offers integrated performance, they often lack flexibility and are difficult to maintain. This project implements a different modular approach, decoupling ASR and LLM components to enhance scalability and independent optimization. The ASR system is designed using a Conformer-based Transformer architecture with Residual Multi-Head Attention (ResMHA) to improve the accuracy of transcripts and modeling of long-range contexts. The output is processed by a lightweight, custom LLM that makes sure of dialogue generation that is efficient and coherent. This design of the pipeline enables easier upgrades while also maintaining strong overall system performance.
+
+\subsection{Motivation}
+Most modern conversational AI systems are built with Automatic Speech Recognition (ASR) and Large Language Models (LLMs) as their core parts. Even so, most existing frameworks combine these parts in a close or full connection which makes them less flexible, scalable and harder to interpret. Errors in different sections of such models tend to spread without being caught and optimizing one section usually means retraining all parts of the model. This brings a lot of difficulties in saving time, handling new domains and ensuring the software is simple to manage. This makes it important for new and existing pipelines to be decoupled and composed of components that can be individually developed, refined and changed without affecting all the other components.
+
+The main goal is to develop a more functional and expandable system for speech-to-dialogue by having each component run alone but still connected together. Because we separate these modules, we can improve just one area of the system such as transcription or speech, without the need for general retraining. Besides, such architecture allows specific changes to be added easily, so the system can work well in customer service, personal assistant and real-time captioning roles.
+
+Our model uses progressive temporal downsampling which decreases the amount of effort and delay needed in real-time tasks and does not harm the quality of transcriptions. After that, the improved ASR system’s output goes into a lightweight custom LLM meant for managing tokens and creating smooth dialogue. While Style-Talker is good at saving voice qualities and producing responsive answers, it gives up being modular and adaptable. It covers the trade-offs, however, it is most concerned with increasing flexibility and making the system work better rather than focusing on small improvements in how the AI speaks. Overall, the purpose of the pipeline is to show that a carefully planned, separated architecture is able to perform competitively and provide more control, clarity and expandability fitting well for continuous development in real situations.
+
+\subsection{Problem Definition}
+Modern Automatic Speech Recognition (ASR) and Large Language Model (LLM) systems face several practical challenges that limit their adaptability and accessibility. These systems often tightly couple the speech recognition and language generation components, making it difficult to optimize or replace individual modules independently. This lack of modularity hinders experimentation and innovation. This can be improved by a modular architecture consisting of independent ASR and Language model.
+
+Most pre-trained models are built for general-purpose tasks and are not easily adaptable to domain-specific datasets. Fine-tuning them often involves complex retraining pipelines or full-system adjustments, which are time-consuming and demand deep technical expertise.
+Even minor changes frequently require retraining the entire system, increasing maintenance effort and slowing down iteration cycles. Having a modular architecture allows for easier fine tuning and customized models that are easier to train and implement.
+
+\subsection{Objectives}
+The objectives of our project are: 
+\begin{itemize}
+    \item To design a context aware conformer based ASR model enhanced with Residual Multi-Head Self Attention and progressive downsampling for accurate and efficient speech transcription.
+    \item To build a lightweight decoder-only transformer language model that processes ASR generated text to produce coherent response in a modular pipeline.
+\end{itemize}
+
+\subsection{Scope and Application}
+
+    \subsubsection{Applications}
+    \begin{itemize}
+        \item \textbf{AI Assistant With Conversational Ability: }The pipeline supports virtual assistants that accurately understand speech and generate natural language responses, enabling personalized and scalable user interactions.
+        \item \textbf{Domain-Specific Information Systems: }The modular design allows for easy fine-tuning and adaptation to specialized fields such as healthcare, legal, and finance, where precise speech understanding is critical.
+        \item \textbf{Language Learning and Pronunciation Tools: } With accurate transcription and feedback capabilities, the system can be integrated into educational platforms to help learners improve speech and acquire new languages.
+    \end{itemize}
+    
+    \subsubsection{Limitations}
+    \begin{itemize}
+        \item \textbf{Latency: } The modular nature of the system introduces cumulative latency across ASR and LLM stages.
+        \item \textbf{Prosodic Inconsistency: } The decoupled ASR-to-LLM interface may result in unnatural prosody and less expressive responses, particularly when used in conjunction with downstream TTS modules.
+        \item \textbf{Error Propagation: } Transcription error from the ASR stage directly affect the LLM's response quality due to lack of feed back loop or joint optimisation.
+        \item \textbf{Resource Utilization: } While modular, the independent training of ASR and Language model component may lead to increased utlization of resources.
+        \item \textbf{Not real-time: } Due to sequential pipeline and lack of tight integration between ASR and Language model, the system is not capable of real time interaction.
+    \end{itemize}
+
+\pagebreak

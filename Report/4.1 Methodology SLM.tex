@@ -1,0 +1,354 @@
+\subsection{Small Language Model}
+\subsubsection{Proposed Architecture Of Small Language Model}
+\begin{figure}[H]
+    \centering
+    \includegraphics[scale=1]{Image PDFs/SLM/SLM-Main.drawio.pdf}
+    \caption{Proposed Architecture Of Small Language Model}
+\end{figure}
+
+\subsubsection{Text Processing}
+This initial stage focuses on cleaning and normalizing raw text data to make it suitable for subsequent processing. The main objective is to reduce noise and inconsistencies. Whitespace normalization is performed where multiple spaces are combined into one and extra spaces at the beginning and the end of the string is removed. Special characters are also handled by converting them into tokens.
+
+\subsubsection{BPE Tokenizer}
+Byte Pair Encoding (BPE) is a subword tokenization algorithm that balances vocabulary size and sequence length by Splitting text into subword units, out-of-vocabulary words through meaningful subword combinations and reducing vocabulary size while maintaining linguistic coherence.
+
+\begin{algorithm}[H]
+\caption{Train BPE Tokenizer}
+
+\textbf{Input:} Training text, desired vocabulary size, special tokens \\
+\textbf{Output:} Vocabulary, BPE merge rules
+
+1. Replace each space in the text with the symbol Ġ
+
+2. Initialize the vocabulary with all unique characters in the text\;
+
+3. Add any special tokens (e.g. $|endoftext|$) to the vocabulary\;
+
+4. Convert the full text into a list of token IDs based on the current vocabulary\;
+
+5. Repeat until vocabulary size reaches target:
+    \begin{itemize}
+        \item Count all adjacent token pairs in the text
+        \item Find the most frequent pair
+        \item Create a new token by merging the pair
+        \item Add the new token to the vocabulary
+        \item Replace all occurrences of the pair with the new token
+    \end{itemize}
+
+6. Return the final vocabulary and merge rules
+\end{algorithm}
+
+\subsubsection{Dataset Preparation}
+
+This step includes preparing the data so that it can be fed to a machine learning model, using batching, padding and making attention masks.
+
+\begin{enumerate}
+    \item \textbf{Sequence Truncation/Padding}
+    
+     Making sure that the length of each sequence in a batch is the same. Too long or short sequences are adjusted to meet the set limit by adding or removing \texttt{<PAD>} tokens.
+
+    \item \textbf{Batching}
+    
+    Combining several sequences into batches so that GPUs handle them more efficiently in parallel.
+    
+    \item \textbf{Attention Mask Creation}
+    
+    Creating a binary mask to distinguish between data tokens and padding tokens. It prevents the model from paying attention to padding tokens when performing attention calculations.
+
+    \item \textbf{Label/Target Generation}
+    
+    If the model is taught to do a particular task (like predict the following word or translate), the required target data are created. When doing language modeling, the goal is frequently to predict the next token in the sequence.
+    
+\end{enumerate}
+
+\subsubsection{Embedding and Positional Encoding}
+Here, each numerical token ID is converted into a dense vector and the location of each token within the sequence is included.
+
+\begin{enumerate}
+    \item \textbf{Token Embeddings}  
+    
+    Every token ID is attached to a large, continuous, vector-like object (embedding). These embeddings are built up over training and pick up on similarities between words (e.g. the words "king" and "queen" might have similar embeddings).
+    
+    \item \textbf{Positional Encoding}
+
+    Since Transformers ignore word order and process all sequences at once, they add positional encodings to the embeddings. They are often fixed curves (like sine waves) or memorized vector sequences that explain the position of each token. Since Transformers ignore word order and process all sequences at once, they add positional encodings to the embeddings. They are often fixed curves (like sine waves) or memorized vector sequences that explain the position of each token.
+\end{enumerate}
+    
+The processed token and its positional encoding are combined to form the final representation that goes to the next layer.
+
+\newpage
+\subsubsection{Decoder}
+% The Decoder block is an essential part and most sequence-to-sequence models (like Transformers) include it. Its task is to take an input sequence and previous outputs to produce a new sequence.
+\begin{figure}[H]
+    \centering
+    \includegraphics[scale=1]{Image PDFs/SLM/SLM-Decoder.drawio.pdf}
+    \caption{Block Diagram of Decoder Architecture}
+\end{figure}
+
+\newpage
+\begin{enumerate}
+    \item \textbf{Masked Multi-Head Self-Attention:} 
+    
+    It helps the decoder focus on all the previous tokens it has created. Because tokens are "masked," only tokens that appeared earlier in the sequence are considered, so later tokens do not influence the ones that appear afterward.
+
+        \textbf{Scaled Dot-Product Attention}
+
+        \textbf{Query-Key-Value Projection}\\
+        Input token embeddings $ X \in \mathbb{R}^{n \times d_{\text{model}}} $ are projected into queries ($ Q $), keys ($ K $), and values ($ V $) using learnable weight matrices for each head $ i $:
+
+        \begin{equation}
+        Q_i = X W^{Q_i}, \quad
+        K_i = X W^{K_i}, \quad
+        V_i = X W^{V_i}
+        \end{equation}
+
+        where:
+        - $ Q_i, K_i, V_i $ are the query, key, and value projections for head $ i $,
+    
+        - $ W^{Q_i}, W^{K_i}, W^{V_i} \in \mathbb{R}^{d_{\text{model}} \times d_k} $ (or $ d_v $ for $ V $) are learnable parameters.
+
+        \begin{figure}[H]
+            \centering
+            \includegraphics[scale=1]{Image PDFs/SLM/SLM-Query-Key-Value.drawio.pdf}
+            \caption{Query Key Value Projection}
+        \end{figure} 
+        
+        \item \textbf{Attention Scores}\\
+        Compute logits via \textit{scaled dot-product attention}. For layer $ l $, residual logits $ {R}^{(l-1)} $ from the previous layer are added:
+
+        \begin{equation}
+         {A}_i^l = \frac{ {Q}_i ( {K}_i)^\top}{\sqrt{d_k}} +  {R}_i^{l-1}
+        \end{equation}
+
+        \textbf{Purpose of Scaling:}\\
+        The dot-products $ Q_i K_i^\top $ grow large in expectation as the dimension $ d_k $ increases, which can lead to small gradients when using activation functions like softmax. Dividing by $ \sqrt{d_k} $ normalizes the variance of the dot-products across different values of $ d_k $, stabilizing the gradients and preventing vanishing or exploding gradients during training.
+
+        \textbf{Causal Masking}
+        
+        Future tokens are masked by setting their attention scores to $ -\infty $ in the attention matrix before applying softmax. This ensures that, during training or inference, the model cannot attend to subsequent tokens, thereby enforcing autoregressive generation.
+        
+    \item \textbf{Cross-Attention:}
+    
+    Enables the decoder to take the output (key and value) from the encoder into account using attention. With this mechanism, the decoder can pay attention to necessary parts of the input when producing a token.
+    
+    \item \textbf{Feed-Forward Networks:}
+    
+    A position-wise fully connected network applies non-linear transformations to refine token representations. Each position uses its own FFN with ReLU activation:
+
+    \begin{equation}
+        \text{FFN}( {Y}) = \max(0,  {Y}  {W}_1 +  {b}_1)  {W}_2 +  {b}_2
+    \end{equation}
+
+    
+    \item \textbf{Residual Connections \& Layer Normalization:} 
+    
+    To help train very deep networks, a residual connection and layer normalization come after each attention and feed-forward sub-layer.
+    
+    \item \textbf{Iterative Generation:}
+    
+    During inference, the decoder generates tokens one at a time using previously generated tokens as inputs (e.g., autoregressive generation of "Winter is cold" from the input "Winter is"). Decoding strategies include:
+
+    \begin{itemize}
+        \item \textbf{Greedy Decoding: }Selects the highest-probability token at each step.
+        \item \textbf{Beam Search: }Maintains the top k candidate sequences to improve contextual coherence
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Language Modelling Head}
+This block uses the wrapped information from the decoder to form predictions about which token is going to appear next.
+
+\begin{itemize}
+    \item \textbf{Linear Transformation:} A linear layer (fully connected neural network) takes the high-dimensional output from the decoder and changes it to a vector as wide as the vocabulary.
+    
+    \item \textbf{Output:} The final product of this layer is a set of raw scores (logits) for each token that can be used. The more positive the logit is, the higher the possibility that token is next in the sequence.
+\end{itemize}
+
+\begin{equation}
+P(y_i | x) = \frac{e^{z_i}}{\sum_{j=1}^V e^{z_j}}
+\end{equation}
+
+Where $Z_i$ are the logits for token $i$, and $V$ is the vocabulary size.
+
+\subsubsection{Loss Functions}
+The next token that the model predicts is compared to the true next token (the ground truth label) during training.
+
+\textbf{Cross-Entropy Loss:}
+Cross-entropy loss is used in classification tasks that deal with language modeling. It finds the difference between the predicted and actual probability distributions. The model tries to lower the amount of loss.
+
+\begin{equation}
+L = -\sum_{i=1}^V y_i \log(\hat{y}_i)
+\end{equation}
+
+Where $y_i$ is true for the next token and 0 otherwise, and $\hat{y}_i$ is the predicted probability for token $i$.
+
+\subsubsection{Inference}
+At inference time (when the model generates text), the softmax scores help decide on the following token to include.
+
+\begin{itemize}
+    \item \textbf{Greedy Decoding:} The token that is most likely to occur is always used first when making a decision.
+    
+    \item \textbf{Beam Search:} Keeps track of the top $k$ sequences at each step which results in outputs that make more sense and cover a wider range of styles.
+    
+    \item \textbf{Sampling:} Usually, the next word is decided by choosing it randomly from the probability distribution and controlling how random it is by adjusting the temperature.
+\end{itemize}
+
+\subsubsection{Perplexity}
+Perplexity is a metric that measures the uncertainty of a model's predictions. It quantifies how well the model predicts the next word in a sequence. When a model makes predictions,it assigns probabilities to possible next words.
+\begin{equation}
+\text{Perplexity}(P) = 2^{H(P)}
+\end{equation}
+
+Entropy measures the level of uncertainty in the model's output. Lower entropy means the model is more certain about its predictions and therefore, the perplexity is lower.
+
+Perplexity indicates the level of confidence the model has in its prediction—lower perplexity suggests higher confidence and better performance in predicting the next word, while higher perplexity signals more uncertainty and less reliability.
+
+\begin{equation}
+\text{Perplexity} = \exp\left( -\frac{1}{N} \sum_{i=1}^{N} \log P(w_i \mid w_{i-1}, w_{i-2}, \dots, w_1) \right)    
+\end{equation}
+
+where,\\
+\begin{itemize}
+    \item  $P(w_i \mid w_{i-1}, w_{i-2}, \dots, w_1)$ is the predicted probability of the $i^th$ word
+    \item N is the total number of words in the sequence
+\end{itemize}
+
+\subsubsection{Masked Loss}
+Masked Cross-Entropy Loss computes the negative log-likelihood of the correct target tokens while excluding padded or invalid positions from contributing to the loss. It measures how well the model predicts the correct tokens, but it ignores padded or invalid tokens. The valid tokens are masked while ignoring the tokens marked with ignore index.\\
+It ensures that loss computation is reflected for only meaningful tokens and prevents the padding symbols from affecting the model evaluation.
+
+\begin{equation}
+\mathcal{L}_{\text{masked}} =
+-\frac{1}{N}
+\sum_{t=1}^{T}
+\mathbb{I}(y_t \neq \text{ignore})
+\log p_\theta(y_t \mid x_t)
+\end{equation}
+
+\subsubsection{BERTScore F1}
+BERTScore-F1 measure the semantic similarity between the generated text and reference text. It does this by computing token-level cosine similarity between contextual embeddings produced by a pretrained BERT model. It checks how similar the generated text is to the reference text by comparing their word meaning with BERT embeddings. It evaluates semantic correctness even when surface-level word overlap is low.
+
+\begin{equation}
+    \text{BERTScore}_{F1} = \frac{2PR}{P + R}
+\end{equation}
+
+
+\textbf{Precision}\\
+Precision measures, on average, how well each token in the candidate matches some token in the reference. High precision means the candidate words are “covered” by reference words.
+\begin{equation}
+P = \frac{1}{|X|} \sum_{x \in X} \max_{y \in Y} \cos(\mathbf{e}_x, \mathbf{e}_y)
+\end{equation}
+
+where:
+
+\begin{itemize}
+    \item $X$ = tokens in the candidate/generated text.
+    \item $Y$ = tokens in the reference text.
+    \item $e_x, e_y$ = embeddings of tokens $x$ and $y$.
+    \item $\cos(e_x, e_y)$ = cosine similarity between embeddings of $x$ and $y$.
+\end{itemize}
+
+\textbf{Recall}\\
+Recall measures how much of the reference content is captured by the candidate. High recall means the candidate includes most of the reference’s meaning.
+\begin{equation}
+R = \frac{1}{|Y|} \sum_{y \in Y} \max_{x \in X} \cos(\mathbf{e}_y, \mathbf{e}_x)
+\end{equation}
+
+where:
+
+\begin{itemize}
+    \item $X$ = tokens in the candidate/generated text.
+    \item $Y$ = tokens in the reference text.
+    \item $e_x, e_y$ = embeddings of tokens $x$ and $y$.
+    \item $\cos(e_y, e_x)$ = cosine similarity between embeddings of $y$ and $x$.
+\end{itemize}
+
+
+\subsubsection{ROUGE}
+ROUGE-L evaluates the similarity between generated and reference text based on the length of their Longest Common Subsequence (LCS). It measures how similar the generated text is to reference text by looking at the longest sequence of words they share in the same order. It captures sentence-level structure and word ordering beyond simple n-gram overlap.
+
+\begin{equation}
+\text{ROUGE-L}_{F1} =
+\frac{2PR}{P + R}
+\end{equation}
+
+\textbf{LCS}\\
+Given two sequences, LCS measures their similarity by identifying the maximum-length subsequence common to both.\\
+LCS$(X, Y)$ = length of the Longest Common Subsequence between candidate text $X$ and reference text $Y$.
+
+\textbf{Precision}\\
+It is the measure where it captures the order by the candidate of all reference token.
+\begin{equation}
+P = \frac{\text{LCS}(X, Y)}{|Y|}
+\end{equation}
+Here, $|Y|$ = number of tokens in the reference.
+
+\textbf{Recall}\\
+It is the measure of matching references of all the candidate tokens.
+\begin{equation}
+R = \frac{\text{LCS}(X, Y)}{|X|}
+\end{equation}
+$|X|$ = number of tokens in the candidate.
+
+\subsubsection{BLEU}
+BLEU stands for Bilingual Evaluation Understudy. It was originally created for machine translation evaluation. It measures how many n-grams in the generated text appear in the reference text. BLEU is focused on precision. It counts the overlap of the n-grams but doesn't directly reward covering all the references i.e. recall isn't explicit. It works by breaking the candidate and reference into n-grams (usually 1-gram to 4-gram). It computes the precision for each n-gram and combines the n-gram precision geometrically.
+
+\subsection*{Step 1: n-gram Precision}
+
+For n-grams of size $n$, the precision is defined as:
+
+\begin{equation}
+P_n = \frac{\text{Number of n-grams in candidate that appear in reference}}{\text{Total number of n-grams in candidate}}
+\end{equation}
+
+\noindent where:
+\begin{itemize}
+    \item $P_n$ = precision for n-grams of size $n$
+\end{itemize}
+
+\subsection*{Step 2: Combine n-gram Precisions}
+
+For BLEU using 1 to $N$ grams, we take the geometric mean of precisions:
+
+\begin{equation}
+\text{Precision}_{1\text{-}N} = \exp \left( \frac{1}{N} \sum_{n=1}^{N} \log P_n \right)
+\end{equation}
+
+\noindent where:
+\begin{itemize}
+    \item $N$ = maximum n-gram size (usually 4)
+    \item $P_n$ = precision for n-grams of size $n$
+\end{itemize}
+
+\subsection*{Step 3: Brevity Penalty (BP)}
+
+To penalize short candidates:
+
+\begin{equation}
+BP = 
+\begin{cases} 
+1 & \text{if } c > r \\
+e^{1 - r/c} & \text{if } c \le r
+\end{cases}
+\end{equation}
+
+\noindent where:
+\begin{itemize}
+    \item $c$ = length of candidate sentence
+    \item $r$ = length of reference sentence
+\end{itemize}
+
+\subsection*{Step 4: Final BLEU Score}
+
+\begin{equation}
+\text{BLEU} = BP \cdot \exp \left( \sum_{n=1}^{N} w_n \log P_n \right)
+\end{equation}
+
+\noindent where:
+\begin{itemize}
+    \item $w_n$ = weight of n-gram precision (usually $w_n = 1/N$ for uniform weighting)
+\end{itemize}
+
+
+
+
+

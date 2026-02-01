@@ -1,0 +1,533 @@
+\newpage
+\section{\MakeUppercase{Implementation Details}}
+\subsection{ASR}
+\subsubsection{Dataset Preparation}
+The LibriSpeech corpus is hierarchically organized into a directory structure to
+facilitate efficient storage and retrieval. In the LibriSpeech 100-hour split
+(\texttt{train-clean-100}), the root directory contains subdirectories named after
+speaker IDs (e.g., \texttt{19}, \texttt{26}). Each speaker directory further contains
+chapter-level subdirectories (e.g., \texttt{198}, \texttt{261}), which store short
+audio utterances in lossless \texttt{.flac} format. These utterances typically range
+from 1 to 10 seconds in duration, are sampled at 16~kHz with 16-bit depth, and use
+lossless compression. Each chapter directory is accompanied by a transcript file
+(\texttt{.txt}) that contains the transcriptions for all utterances in that chapter.
+
+For ease of implementation during model development, the \texttt{torchaudio}
+library in PyTorch provides the \texttt{LIBRISPEECH} dataset class, which
+automatically parses this directory structure and returns audio waveforms together
+with the corresponding metadata.
+
+In addition, several modern speech recognition toolkits such as NVIDIA NeMo,
+ESPnet, and Fairseq rely on manifest files to organize training data. A manifest is
+typically stored in the JSON Lines (JSONL) format, where each line corresponds to a
+single utterance and contains the following fields:
+
+\begin{itemize}
+	\item \texttt{audio\_filepath}: path to the \texttt{.flac} audio file,
+	\item \texttt{duration}: duration of the utterance in seconds,
+	\item \texttt{text}: the cleaned transcript of the utterance.
+\end{itemize}
+
+To construct a manifest file for the LibriSpeech \texttt{train-clean-100} split, the
+transcript (\texttt{.txt}) files associated with each chapter can be read and mapped
+to their corresponding \texttt{.flac} audio files using the utterance identifiers.
+The resulting entries are written sequentially to a manifest file (e.g.,
+\texttt{librispeech\_train\_clean\_100.json}). This representation enables faster
+randomized access, supports dynamic batching, and allows seamless integration with
+data loaders that are independent of PyTorch-specific dataset classes.
+
+\begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = LibriSpeech Dataset Downloader]    
+    from torchaudio.datasets import LIBRISPEECH
+    
+    dataset = LIBRISPEECH(root="data", url="train-clean-100",
+     download=True)
+    waveform, sample_rate, transcript, speaker_id, chapter_id,
+     utterance_id = dataset[0]
+    
+\end{lstlisting}
+
+\subsubsection{Computing Mel Spectrogram}
+
+In order to to feed Conformer, we need to pre-process raw audio data. We employed feature extraction pipeline which transforms raw audio waveforms in log Mel Spectrograms. This process is important in limiting the large dimensionality of input signal. 
+
+Sliding window approach is applied to cut the raw audio waveform into overlapping frames. The windowing process is specified by the following parameters:
+
+%\textbf{--- Code Needs Update Here ----}
+%\begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = Mel Spectogram Transformer]
+%    self.mel_transform = T.MelSpectrogram(
+ %       sample_rate=16000,
+ %       n_fft=512,
+ %       hop_length=160,
+ %       n_mels=80
+  %  )
+   % self.db_transform = T.AmplitudeToDB()
+% \end{lstlisting}
+
+\begin{table}[H]
+\caption{Audio Feature Extraction Parameters}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Sample Rate ($sample\_rate$) & 16000 \\
+Normalization ($normalize$) & per\_feature \\
+Window Size ($window\_size$) & 0.025 \\
+Window Stride ($window\_stride$) & 0.01 \\
+Window Function ($window$) & hann \\
+Number of Features ($features$) & 80 \\
+FFT Size ($n\_fft$) & 512 \\
+Log Scaling ($log$) & True \\
+Frame Splicing ($frame\_splicing$) & 1 \\
+Dither ($dither$) & $1\times10^{-5}$ \\
+Padding To ($pad\_to$) & 0 \\
+Padding Value ($pad\_value$) & 0.0 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+The magnitude spectrogram is converted into a Mel-scale representation through a bank of triangular filters in order to highlight perceptually interesting frequencies and down sample. Mel Filters are used where each spectrogram is projected in 80 Mel filters creating a compact representation. Logarithmic scaling is performed so that the filter bank is changed to a scale closer to human auditory perception and present better numerical stability during training.
+
+
+% \begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = Augmentation with frequency and time masking parameters]
+%     self.spec_augment = torch.nn.Sequential(
+%         T.FrequencyMasking(freq_mask_param=25),
+%         T.TimeMasking(time_mask_param=25)
+% \end{lstlisting}
+
+\subsubsection{Spectrogram Augmentation}
+
+The graph 5-1 displays the raw audio waveform of the first sample from a random batch, it is visualized as a continuous line plot where the horizontal axis represents the time in terms of the audio frames and the vertical axis represents the corresponding amplitude. The waveform appears dense and oscillatory, with various fluctuations indicating complex sound signals such as speech. This type of waveform is obtained by loading the audio file using torchaudio.load(), which returns the waveform and sampling rate, the waveform tensor is then squeezed and converted to NumPy array for plotting using matplotlib.plot().
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Waveform.png}
+    \caption{Raw Audio Waveform}
+    \label{fig:Raw Audio Waveform}
+\end{figure}
+
+The graph 5-2 shows a Mel spectrogram of the first audio sample, visualized using a color map. The spectrogram represents the frequency over time, with brighter colors indicating higher magnitudes and darker regions indicating lower magnitudes of energy. This Spectrogram is derived from the raw audio waveform plotted in the previous image, which was processed using short-time Fourier transform (STFT).
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Mel Spectogram.png}
+    \caption{Mel Spectrogram Of Raw Audio}
+    \label{fig:Mel Spectogram Of Raw Audio}
+\end{figure}
+
+This is the Log Mel Spectrogram of an audio sample. Each value of energy magnitude at mel frequency bin for a particular time frame is calculated and log is applied.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Log_Mel_Spec.png}
+    \caption{Log Mel Spectrogram}
+    \label{fig:Log Mel Spectrogram}
+\end{figure}
+
+This graph 5-4 shows the frequency masking of a log mel spectrogram. The values of some frequency band is masked (hidden) at random. It simulates missing parts in audio. It forces the model to not rely too much on specific frequency bands. The model learns to focus on broader context and other frequency features, not just one narrow band.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Freq_Mask_20.png}
+    \caption{Spec Augmentation with Frequency Mask = 20}
+    \label{fig:Spec Augmentation with Frequency Mask = 20}
+\end{figure}
+
+The graph 5-5 shows the time masking of a log mel spectrogram. The values of some continuous time frames are masked( hidden) at random. It helps the model to fill in gaps or use information from before and after the masked time segment. It makes the model not rely too much on specific time parts of the audio (like certain words or sounds).
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Time_Mask_20.png}
+    \caption{Spec Augmentation with Time Mask = 20}
+    \label{fig:Spec Augmentation with Time Mask = 20}
+\end{figure}
+
+The graph 5-6 shows the time warping of a log mel spectrogram. Time Warping means stretching or compressing parts of the spectrogram along the time axis. It changes the timing of events in the audio without changing the contents. It helps us simulate the various speaking speeds. It improves the ability to generalize across different speakers and speech styles.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Time_Warp_20.png}
+    \caption{Spec Augmentation with Time Warp = 20}
+    \label{fig:Spec Augmentation with Time Warp = 20}
+\end{figure}
+
+The graph 5-7 shows the combination of above 3 augmentation spectrograms. It simulates the different gaps in speech, the rate of speaking and helps the model to not rely on particular frequency bands.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Aug_All_20.png}
+    \caption{Spec Augmentation with Time Warp, Frequency and Time Masking = 20}
+    \label{fig:Spec Augmentation with Time Warp, Frequency and Time Masking = 20}
+\end{figure}
+
+\textbf{Hyper Parameters of Spectrogram Augmentation}
+\begin{table}[H]
+\caption{Spectrogram Augmentation Parameters}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Frequency Masks ($freq\_masks$) & 2 \\
+Time Masks ($time\_masks$) & 5 \\
+Frequency Mask Width ($freq\_width$) & 27 \\
+Time Mask Width ($time\_width$) & 0.05 \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\subsubsection{Batching using Collate Function}
+
+We have a collate function which operates on batch of variable length sequential item. The collate function takes a batch of sequences and applies padding to each sequence, ensuring they all match the length of the longest sequence in the batch. Additionally, the collate function outputs three components: the padded sequence, the original length of each sequence before padding, and the corresponding label for each sequence. In deep learning packages such as PyTorch, the inputs are fed in batches by data loaders. Speech data and their transcripts are normally of unequal length. This operation makes sure that all sequences in a batch have been padded to the same length making them be easily processed by the model.
+\begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = Collate Function]
+    def collate_fn(batch):
+        specs, transcripts,waveforms = zip(*batch)
+        max_len = max(spec.shape[-1] for spec in specs)
+        padded_specs = [
+            F.pad(spec, (0, max_len - spec.shape[-1]))
+            for spec in specs
+        ]
+        batch_specs = torch.stack(padded_specs)
+        return batch_specs, transcripts,waveform
+\end{lstlisting}
+
+\subsubsection{Encoder}
+\begin{enumerate}
+	
+	\item \textbf{Input Features}
+	
+	The input features are 80-dimensional and are provided to the encoder. These features are mel-spectrogram representations derived from raw audio signals and capture relevant spectral characteristics required for speech recognition.
+	
+	\item \textbf{Output Features}
+	
+	The output feature dimension is set to $-1$, meaning it remains consistent with the internal model dimension ($d_{\text{model}}$), which is 176. As a result, the encoder outputs 176-dimensional feature representations.
+	
+	\item \textbf{Number of Layers}
+	
+	The encoder consists of 16 stacked Conformer blocks. Each block integrates self-attention, convolutional modules, and feed-forward networks to effectively model both local and global sequential dependencies.
+	
+	\item \textbf{Model Dimension}
+	
+	The internal representation dimension of the encoder is set to 176. This dimension defines the size of the hidden states used throughout the model.
+	
+	\item \textbf{Subsampling Method}
+	
+	Temporal resolution reduction is achieved through strided subsampling. This method skips time steps to reduce computational cost while preserving essential information in the sequence.
+	
+	\item \textbf{Subsampling Factor}
+	
+	The input sequence length is reduced by a factor of 4. For instance, an input sequence of 100 time steps is subsampled to 25 time steps.
+	
+	\item \textbf{Subsampling Channels}
+	
+	A convolutional subsampling layer with 176 channels is applied. This ensures that the feature dimension after subsampling matches the model’s internal dimension.
+	
+	\item \textbf{Feed-Forward Expansion Factor}
+	
+	Each Conformer block includes a feed-forward network that expands the input dimension by a factor of 4. This expansion allows the model to learn richer representations before projecting back to the original dimension.
+	
+	\item \textbf{Self-Attention Mechanism}
+	
+	The encoder employs self-attention with relative positional encoding. This mechanism captures relative distances between tokens, enhancing the model’s ability to handle long input sequences effectively.
+	
+	\item \textbf{Number of Attention Heads}
+	
+	The multi-head self-attention mechanism uses 4 attention heads. This allows the model to focus on multiple parts of the input sequence simultaneously.
+	
+	\item \textbf{Attention Context Size}
+	
+	The attention mechanism considers the entire sequence, indicated by the unbounded context setting $[-1, -1]$. This enables global context modeling, which is crucial for automatic speech recognition tasks.
+	
+	\item \textbf{Attention Scaling}
+	
+	Dot-product attention scores are scaled by dividing by the square root of the model dimension. This scaling improves numerical stability by preventing excessively large attention values.
+	
+	\item \textbf{Untied Biases}
+	
+	Biases used in relative positional encoding are untied, meaning they are learned separately for each attention head. This provides greater flexibility in learning position-specific representations.
+	
+	\item \textbf{Convolutional Kernel Size}
+	
+	Each Conformer block includes a depthwise convolutional layer with a kernel size of 31. This large kernel size is effective in capturing local temporal dependencies in speech signals.
+	
+	\item \textbf{Overall Dropout Rate}
+	
+	A dropout rate of 0.1 is applied across the model to reduce overfitting and improve generalization during training.
+	
+	\item \textbf{Attention Dropout Rate}
+	
+	The self-attention mechanism uses a dropout rate of 0.1. This regularizes attention weights, enhances generalization, and supports effective modeling of long-range dependencies in speech sequences.
+	
+\end{enumerate}
+
+\begin{table}[H]
+	\caption{Encoder Configuration Parameters}
+	\centering
+	\begin{tabular}{|l|l|}
+		\hline
+		\textbf{Parameter} & \textbf{Value} \\
+		\hline
+		Input Feature Dimension ($feat\_in$) & 80 \\
+		Output Feature Dimension ($feat\_out$) & $-1$ (equals $d_{\text{model}}$) \\
+		Number of Layers ($n\_layers$) & 16 \\
+		Model Dimension ($d_{\text{model}}$) & 176 \\
+		Subsampling Method & Striding \\
+		Subsampling Factor & 4 \\
+		Subsampling Convolution Channels & 176 \\
+		Feed-Forward Expansion Factor & 4 \\
+		Self-Attention Model & Relative Positional Encoding \\
+		Number of Attention Heads ($n\_heads$) & 4 \\
+		Maximum Positional Embedding Length & 5000 \\
+		Convolutional Kernel Size & 31 \\
+		Dropout Rate & 0.1 \\
+		\hline
+	\end{tabular}
+\end{table}
+
+
+\subsubsection{Decoder}
+
+The decoder component in this ASR system is implemented using NVIDIA NeMo's \texttt{ConvASRDecoder} class. It serves as the final classification layer that maps high-level acoustic representations to linguistic tokens. The decoder follows a Connectionist Temporal Classification (CTC) framework, which enables effective sequence-to-sequence alignment without requiring explicit frame-level supervision.
+
+\textbf{Input and Output Dimensions}
+\begin{itemize}
+	\item The decoder receives 176-dimensional input features, which correspond to the output of the encoder’s final layer. These features represent compact and context-rich acoustic embeddings produced after convolutional and transformer-based processing.
+	\item The number of output classes (\texttt{num\_classes}) is set to 1024. This includes 1023 subword tokens and one additional blank token required by the CTC loss for alignment flexibility during decoding.
+\end{itemize}
+
+\textbf{Vocabulary Design}
+
+The vocabulary consists of 1023 subword units generated using Byte-Pair Encoding (BPE). This design provides a balance between vocabulary compactness and linguistic expressiveness, enabling efficient handling of both frequent and rare words.
+
+\textbf{Token Composition}
+
+The vocabulary includes a combination of special tokens and multiple levels of subword granularity to support robust speech-to-text modeling.
+
+\begin{itemize}
+	\item \textbf{Special Tokens}
+	
+	The \texttt{<unk>} token represents unknown or out-of-vocabulary words and is assigned index 0.  
+	A word-boundary marker represented by \texttt{\textbackslash u2581} is used to denote a preceding whitespace, allowing the model to learn word segmentation explicitly.
+	
+	\item \textbf{Subword Types}
+	
+	Character-level tokens include individual letters from \texttt{a} to \texttt{z}.  
+	Morpheme-level tokens capture common suffixes such as \texttt{-ing}, \texttt{-ed}, \texttt{-tion}, and \texttt{-ment}.  
+	Word-piece tokens represent frequently occurring syllables or partial words.  
+	Whole-word tokens correspond to high-frequency content words that appear often in the training data.
+\end{itemize}
+
+\subsubsection{CTC Implementation}
+\textbf{Architecture Components}
+
+\begin{itemize}
+	\item Single linear projection layer
+	\item LogSoftmax activation for probability normalization
+	\item No hidden layers, which is standard for CTC-based output decoding
+\end{itemize}
+
+\textbf{CTC Loss Integration}
+
+\begin{itemize}
+	\item \textbf{Blank Token}: Implicitly included as the 1024th output class
+	\item \textbf{Alignment}: Supports variable-length sequence alignment using dynamic programming
+	\item \textbf{Gradient Flow}: Enables direct backpropagation through all valid time-aligned paths
+\end{itemize}
+
+\subsubsection{Optimizer Configurations}
+The model  was trained by the AdamW optimizer [Loshchilov \& Hutter, 2017] \cite{ilya} and a cosine annealing learning rate schedule. The hyperparameters of the optimization were chosen very carefully with respect to the empirical observations and the best practices that are applicable in the domain of speech recognition.
+
+\textbf{Optimizer: AdamW}
+
+\begin{itemize}
+	\item \textbf{Learning Rate}: $5 \times 10^{-4}$, reduced from the pre-training learning rate of $1 \times 10^{-3}$. This reduction allows finer parameter updates during fine-tuning, preserving previously learned representations while adapting to the target domain.
+	
+	\item \textbf{Betas}: $[0.9, 0.98]$. These momentum parameters control the exponential decay rates of the first and second moment estimates. The chosen values follow Transformer conventions, with a slightly higher second-moment decay compared to the commonly used value of 0.999, making them better suited for speech data.
+\end{itemize}
+
+The model architecture is relatively compact, which reduces the risk of overfitting due to a smaller parameter count. Additional implicit regularization is achieved through extensive data augmentation using SpecAugment~\cite{park2019specaugment}. The reduced learning rate during fine-tuning further constrains parameter updates, while explicit dropout within the model provides additional regularization.
+
+\textbf{Learning Rate Schedule: Cosine Annealing with Warmup}
+
+\begin{itemize}
+	\item \textbf{Scheduler}: \texttt{NoamAnnealing}. The learning rate increases linearly during the warmup phase and subsequently decays proportionally to the inverse square root of the training step. This scheduling strategy is particularly effective for Transformer-based architectures.
+	
+	\item \textbf{Warmup Steps}: 10{,}000. During the initial warmup phase, the learning rate is gradually increased from near-zero to its peak value, which helps prevent optimization instability in the early stages of training.
+	
+	\item \textbf{Minimum Learning Rate}: $1 \times 10^{-6}$. As training progresses, the learning rate decays toward this lower bound, enabling stable convergence in later stages without disrupting previously learned representations.
+\end{itemize}
+
+\begin{table}[H]
+	\caption{Optimizer and Learning Rate Scheduler Configuration}
+	\centering
+	\begin{tabular}{|l|l|}
+		\hline
+		\textbf{Parameter} & \textbf{Value} \\
+		\hline
+		Optimizer Name & AdamW \\
+		Learning Rate ($lr$) & 2.0 \\
+		Betas ($\beta_1, \beta_2$) & [0.9, 0.98] \\
+		Weight Decay & 0 \\
+		Scheduler Name & NoamAnnealing \\
+		Model Dimension ($d_{\text{model}}$) & 176 \\
+		Warmup Steps & 10000 \\
+		Warmup Ratio & None \\
+		Minimum Learning Rate ($min\_lr$) & $1 \times 10^{-6}$ \\
+		\hline
+	\end{tabular}
+\end{table}
+
+
+\subsection{SLM}
+\subsubsection{Dataset}
+The model is trained on Alpaca dataset \cite{alpaca} which is an instruction following dataset which consists of about 52,000 examples of instructions with 4 fields.
+\begin{itemize}
+	\item \textbf{Instruction: }
+	A description of task to be performed
+	\item \textbf{Output: }
+	Optional contextual or additional information for the task
+	\item \textbf{Text: }
+	A formatted combination of all components using a standardized template 
+\end{itemize} 
+This dataset is then prepared for training by selecting instruction, input and output columns and changing the format into the dictionary which created the proper structure for training. 
+
+\subsubsection{Data Preparation and Pipeline}
+The dataset is processed to support instruction fine-tuning. The pipeline is designed to handle variable-length sequences. We use a custom instruction Dataset class which pre-tokenizes the data by concatenating the instruction, input, and expected output into a single continuous format:
+
+\begin{verbatim}
+	Instruction + Input + ###Response: output
+\end{verbatim}
+
+A custom collate function is used to construct training batches where sequences are padded to the maximum length in the batch using the $endoftext$ token with ID 50256. The target values for padded positions are set to an ignore index of -100 so the model does not learn from padding tokens and excludes them from loss calculation. 
+
+\subsubsection{Loading weight and Training configuration}
+The model is initialized with pre-trained GPT-2 weights. We implement a custom loading mechanism to map external parameters to the specific PyTorch architecture, where weights are assigned to their corresponding layers. The token embeddings ($wte$) and positional embeddings ($wpe$) are directly mapped to the model embedding layers. The pretrained attention weights ($c_{\text{attn}}$) are split along the last dimension into three distinct components: Query, Key, and Value ($Q, K, V$). The weight matrices for the attention and feed-forward layers are transposed to match PyTorch linear layer expectations.
+
+To train the model, the AdamW optimizer is used to properly handle weight decay, and a low learning rate is applied to fine-tune the model without destabilizing learned representations. The dataset is partitioned using an 85/10/5 split, where training is performed on 85\% of the dataset, testing on 10\%, and validation on 5\%.
+
+\begin{table}[h]
+	\caption{Hyperparameters used for model training}
+	\centering
+	\begin{tabular}{|l|l|}
+		\hline
+		\textbf{Hyperparameter} & \textbf{Value} \\
+		\hline
+		Batch Size &  8\\
+		Learning Rate & 5x10-5 \\
+		Optimizer & AdamW \\
+		Number of Epochs &  5\\
+		Weight Decay &  0.1\\
+		Max Sequence Length & 1024 tokens \\
+		\hline
+	\end{tabular}
+\end{table}
+
+The training loop evaluates the model on validation set every 5 steps to track convergence and prevent overfitting.
+
+\subsubsection{BPE Tokenizer}
+Character level vocabulary is built including all ASCII characters where a special whitespace character Ġ is used. The merging rule is used to combine symbol pairs into sub word tokens. During training, the tokenizer maps each character to its ID and finds the most adjacent pair and replaces occurrences of the pair with new token ID and records the merge until desired vocabulary size is reached. The existing encoder.json vocabulary and vocab.bpe are rules of merging list which assigns each merge a rank so that lower pairs are merged first. During encoding, each chunk is looked up in the vocab and if the chunk is not found then it is passed to the  BPE merger which is split into individual character level token IDs then the merging is done using merge rules from vocab.bpe with accordance to its rank. This process is repeated until no further merges can be performed. The decoding reverses the process converting Ġ back into real spaces and concatenating tokens into readable text.  
+
+\begin{lstlisting}[basicstyle=\footnotesize\ttfamily,caption = Output of BPE Tokenizer on a sample text]
+    Input Text : We study in IOE Thapathali #2@ located 
+    near Maitighar Mandala.
+
+    Token id: [1135, 2050, 287, 24418, 36, 536, 499, 776, 7344, 
+    1303, 17, 31, 5140, 1474, 285, 4548, 394, 283, 6855, 6081]
+
+    Tokenized text: We  study  in  IO E  Th ap ath ali  # 2 @ 
+    located near  m ait igh ar  mand ala
+\end{lstlisting}
+
+\subsubsection{Data Embedding}
+\textbf{Text Embedding}\\
+The token IDs are converted into embedding vectors. First the embedding weights are initialized with random values which get changed during the training process. Token embedding provides meaning to the ids. During training tokens dimensions will change so tokens having similar meaning are near to each other in vector space. Embeddings are used to find meanings among the words and not see words as unrelated, random weights. To create embedding vectors a matrix of size $vocab\_size * output\_dim$ is created. If $vocab\_size = 6$ and $output\_dim = 3$ then,
+
+\begin{verbatim}
+tensor([[-0.25091976,  0.90142861,  0.46398788],
+        [ 0.19731697, -0.68796272, -0.68801096],
+        [-0.88383278,  0.73235229,  0.20223002],
+        [ 0.41614516, -0.95883101,  0.9398197 ],
+        [ 0.66488528, -0.57532178, -0.63635007],
+        [-0.63319098, -0.39151551,  0.04951286]], requires_grad=True)
+\end{verbatim}
+
+
+\textbf{Positional Embedding}\\
+Self attention mechanism does not have a notion of position or order of tokens within a sequence. Absolute positional embedding is used which is optimized during the training process. For each token ids a vector is created which is than added to previous token embedding and passed to the model.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Image PDFs/Embedding.pdf}
+    \caption{Token and Positional Embedding}
+\end{figure}
+
+\subsubsection{Masked Multi-Head Attention Mechanism}
+The Multi-Head Attention module uses a casual scaled dot product attention mechanism with multiple heads to create a context vector. 
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{Image PDFs/AttentionMechanism.pdf}
+    \caption{Attention Mechanism}
+    \label{fig:Attention Mechanism}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{Initialization and projection: }
+    The input tensor has shape $(B, T, d_{in})$ where $B$ is the batch size and $T$ is the sequence length. The output dimension $d_{out}$ should be divisible by the number of heads $h$, i.e.,
+        $
+        d_k = \frac{d_{out}}{h}
+        $
+    The first three linear layers $W_{\text{query}}, W_{\text{key}}, W_{\text{value}}$ are initialized to project input embeddings into query, key, and value vectors. A causal mask using an upper triangular matrix is applied, ensuring that during training the model attends only to previous positions, preventing information leakage.
+
+    $$Q = XW_Q \quad K = XW_K \quad V = XW_V$$
+
+    The data is projected once and reshaping of resulting tensors is done instead of using separate layers for each head.
+    
+    \item \textbf{Scaled dot-product attention: }
+    First the raw attention scores are calculated by performing matrix multiplication between queries and the transposed keys. To prevent information leakage a casual mask M an upper triangular matrix of negative infinity is used with scores. Then the attention weights are computed by scaling the scores by $\sqrt{d_k}$ and applying a Softmax function:
+
+    \begin{equation}
+        \text{Attention}(Q, K, V) = \mathrm{softmax}\!\left(\frac{QK^{T}}{d_k} + M\right)V
+    \end{equation}
+    The scaling factor $\sqrt{d_k}$ is critical here to counteract the effect of large dot products pushing the Softmax function into regions with extremely small gradients.
+
+    After applying the attention weights to the value vectors V, the resulting context vectors from all h heads are transposed and concatenated to restore the original sequence shape (B,T,$d_{out}$). Finally, a linear output projection W is applied to mix the concatenated representations across heads, yielding the final output of the module.
+    
+\end{itemize}
+
+
+
+\subsubsection{Model Creation}
+\textbf{Layer Normalization and GELU activation}\\
+For layer normalization which normalizes activations across the embedding dimension for each token independently to compute the mean and variance along the last dimension.
+
+\begin{equation}
+\hat{x} = \frac{x - \mu}{\sqrt{\sigma^2 + \epsilon}}, \quad
+y = \gamma \hat{x} + \beta
+\end{equation}
+
+
+\begin{table}[h]
+\caption{Model Hyperparameters}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Vocabulary Size ($vocab\_size$) & 50257 \\
+Context Length ($context\_length$) & 1024 \\
+Dropout Rate ($drop\_rate$) & 0.0 \\
+QKV Bias ($qkv\_bias$) & True \\
+Embedding Dimension ($emb\_dim$) & 768 \\
+Number of Layers ($n\_layers$) & 12 \\
+Number of Heads ($n\_heads$) & 12 \\
+\hline
+\end{tabular}
+\end{table}
+
+This feed network uses the Gaussian Error Linear Unit (GELU) activation. It introduces non-linearity while allowing small negative values to pass smoothly.
+
+\begin{equation}
+\mathrm{GELU}(x) = 0.5 \, x \left[ 1 + \tanh \left( \sqrt{\frac{2}{\pi}} \left( x + 0.044715 \, x^3 \right) \right) \right]
+\end{equation}
+
+\textbf{Transformer block and model}\\
+The first input goes through layer normalization. The feed forward part consists of two linear layers. The first expands the embedding dimension to 4 times its size, applies GELU and projects the original embedding dimension towards the second linear layer. Which is followed by multi-head attention sub-layer. A dropout is applied to the attention output and a residual connection adds a shortcut. This process is repeated multiple times to form a core transformer stack. The model begins with a token embedding layer and positional embedding of the same dimensions. Which then flows to the stack of n\_layers of the transformer block. A last layer normalization is applied and linear output head is used that projects the embeddings to a vocabulary size. The result logits represents unnormalized probabilities over next token for each position in the sequence.
+
+
+% \subsubsection{Model Evaluation}

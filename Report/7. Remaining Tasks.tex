@@ -1,0 +1,36 @@
+\newpage
+\section{\MakeUppercase{Remaining Tasks}}
+\subsection{ASR Module}
+
+\textbf{Application of Beam Search Decoder and Language-Model Fusion to Enhance WER}
+
+\begin{itemize}
+	\item The existing ASR solution makes use of a small model with limited contextualization capability, which can lead to less accurate transcriptions.
+	\item To address this limitation, a beam search decoder is employed, enabling exploration of multiple possible output sequences rather than selecting only the most probable token at each decoding step.
+	\item In addition, language-model (LM) fusion is incorporated during decoding to integrate external linguistic knowledge, helping to correct frequent errors such as homophones, missing words, and grammatical inconsistencies.
+	\item During beam search, an \( n \)-gram language model trained on domain-relevant text data is integrated with the ASR outputs.
+	\item This approach is expected to significantly reduce the Word Error Rate (WER) without increasing the size or computational complexity of the base ASR model.
+\end{itemize}
+
+\textbf{Refinement on More Diverse Datasets}
+
+\begin{itemize}
+	\item The model will be fine-tuned on a broader and more diverse range of speech data to improve robustness and generalization.
+	\item The datasets will include variations in accents, background noise, speech rate, and domain-specific vocabularies, such as conversational speech, technical terminology, and local dialects.
+	\item Additional training data will be sourced from publicly available corpora such as Common Voice, Switchboard, and similar datasets.
+	\item Careful fine-tuning will be performed using validation monitoring and early stopping to prevent overfitting, given the limited capacity of the model.
+	\item The overall goal is to enhance the stability of the ASR system in real-world scenarios while preserving its lightweight design.
+\end{itemize}
+
+\subsection{Small Language Model}
+\textbf{Model Scaling, Parameter Reduction and Ablation studies}
+
+The model needs to be downscaled from its base model with a parameter count of 124M to create more lightweight variants by removing each layer to create a smaller model. To understand the contribution of specific architectural components the removing or altering of individual parts of the model and observing the loss and generation quality of the model These includes Attention head pruning to remove attention heads to determine the minimum number of heads which gives satisfactory result.Feed forward Network reduction and Layer wise removal of model.
+
+\textbf{Comparative  Training}
+
+Every down-scaled model needs to undergo training to compare against the baseline by training the model architecture in the original dataset, monitoring training dynamics and see how evaluation metrics change with different configurations. The goal is to find the relationship between parameter count and model performance to visualize. 
+
+\textbf{Impact Analysis and Metric Evaluation}
+
+The analysis of trade-off between model size and performance capability needs to be done. Find the relationship between parameter count and model performance to visualize the impact. Sensitivity analysis to quantify which components have the highest impact on model accuracy and performance shows which components  are negotiable or not and the importance of individual components. Select the smallest possible architecture that shows satisfactory results.

@@ -1,0 +1,107 @@
+\documentclass{ioereport}
+\usepackage{amsmath}
+\usepackage{tabularx} % For adjustable table width
+\usepackage{float}    % For better table positioning
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{caption} 
+\usepackage{subcaption} % Add this to your preamble % Add this to your preamble
+% The outlines in hyperrefs won't affect the printed documents so you can leave it as is
+% \hypersetup{hidelinks}  % Uncomment to hide red-outlines in hyperreferences
+
+%Yo chij code segment haru rakhna lai chahinxa
+\usepackage{listings}
+
+\usepackage[
+backend=biber,
+style=ieee
+]{biblatex}
+
+\addbibresource{references.bib}
+
+\begin{document}
+
+% add the title preamble
+\titlepreamble{A Major Project Mid Term Report \\On}
+
+% add the project title
+\projecttitle{A Dual Transformer Pipeline with Conformer-Based Speech Recognition and Decoder-Only Language Modeling} 
+
+% add author names
+\addauthor{Sangam Parajuli}{THA078BCT039}
+\addauthor{Saurav Katwal   }{THA078BCT040}
+\addauthor{Shaswot Poudyal}{THA078BCT041}
+\addauthor{Shreejay Shakya}{THA078BCT042}
+
+% add supervisor name
+\supervisor{Er. Ganesh Kumal}
+
+% coverpage
+\coverpage
+
+% start of phantom section
+\phantomsec
+
+% for second coverpage 
+% uncomment for coverpageB
+\coverpageB
+
+% \input{sec/1. Declaration}
+% \input{sec/2. Certificate Of Approval}
+% \input{sec/3. Copyright }
+\input{sec/Acknowledgement}
+\input{sec/Abstract}
+% Table of Contents
+\tableofcontents
+\renewcommand\contentsname{TABLE OF CONTENTS}
+\pagebreak
+
+% List of Figures
+\addcontentsline{toc}{section}{LIST OF FIGURES}  % Add to ToC
+\listoffigures
+\pagebreak
+
+% List of Tables
+\addcontentsline{toc}{section}{LIST OF TABLES}  % Add to ToC
+\listoftables
+\pagebreak
+
+% list of abbreviations
+\input{acronyms}
+
+% Start of main section
+\mainsection
+\input{Report/1. Introduction}
+\input{Report/2. Literature Review}
+\input{Report/3. Requirement Analysis}
+\input{Report/4. Methodology}
+\input{Report/4.1 Methodology SLM}
+\input{Report/5. Implementation Details}
+\input{Report/6. Results}
+\input{Report/7. Remaining Tasks}
+\input{Report/8. Appendices}
+
+% No-cites Here
+\nocite{cif}
+\nocite{streaming-trans-nobeam}
+\nocite{streaming-trans}
+\nocite{sangam-book}
+\nocite{bert}
+\nocite{wav2vec}
+\nocite{espnet}
+\nocite{macaron}
+\nocite{speechLLM}
+\nocite{attentionneed}
+\nocite{alpaca}
+\nocite{slim}
+\nocite{laco}
+\nocite{ablation}
+\nocite{layerwise}
+
+% References (IEEE style)
+\newpage
+\printbibliography
+\addcontentsline{toc}{section}{\MakeUppercase{References}}
+
+\end{document}
