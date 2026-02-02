@@ -1,0 +1,23 @@
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# BibTeX / Biber
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+
+# Output PDFs (optional – see note below)
+*.pdf
+
+# OS junk
+.DS_Store
+Thumbs.db

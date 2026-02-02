@@ -1,1 +1,13 @@
-# Dual-Conformer-Latek
+# A Dual Transformer Pipeline with Conformer-Based Speech Recognition and Decoder-Only Language Modeling
+
+## Force Compile
+```
+latexmk -pdf -interaction=nonstopmode main.tex
+```
+
+-------------------------
+
+### Abstract
+Modern speech LLM systems heavily rely on the integration of Automatic Speech Recognition (ASR) and Large Language Models (LLMs). However, most existing architectures adopt tightly coupled ASR-LLM pipelines which limits their flexibility, scalability, and modularity. This project proposes a modular approach that decouples ASR and LLM components allowing independent development, fine-tuning, and optimization. The ASR system is designed using a Conformer-based Transformer architecture enhanced with Residual Multi-Head Self-Attention (ResMHA) and progressive temporal downsampling for accurate and efficient speech transcription. The transcribed output is then processed by a lightweight, decoder-only Transformer LLM, which generates coherent and contextually relevant responses. Despite certain trade-offs like increased latency and lack of real-time interaction, the proposed architecture demonstrates high adaptability and performance in various applications such as AI assistants and domain-specific information systems. The project plans to demonstrate the potential of a decoupled architecture in advancing scalable and maintainable AI systems.
+
+-------------------
