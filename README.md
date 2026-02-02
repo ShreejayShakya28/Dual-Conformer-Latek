@@ -5,6 +5,11 @@
 latexmk -pdf -interaction=nonstopmode main.tex
 ```
 
+Clean Before Pushing
+```
+latexmk -C
+```
+
 -------------------------
 
 ### Abstract
