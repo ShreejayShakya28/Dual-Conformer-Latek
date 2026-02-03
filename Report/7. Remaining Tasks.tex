@@ -1,25 +1,15 @@
 \newpage
 \section{\MakeUppercase{Remaining Tasks}}
-\subsection{ASR Module}
-
-\textbf{Application of Beam Search Decoder and Language-Model Fusion to Enhance WER}
-
+\subsection{Pipeline}
 \begin{itemize}
-	\item The existing ASR solution makes use of a small model with limited contextualization capability, which can lead to less accurate transcriptions.
-	\item To address this limitation, a beam search decoder is employed, enabling exploration of multiple possible output sequences rather than selecting only the most probable token at each decoding step.
-	\item In addition, language-model (LM) fusion is incorporated during decoding to integrate external linguistic knowledge, helping to correct frequent errors such as homophones, missing words, and grammatical inconsistencies.
-	\item During beam search, an \( n \)-gram language model trained on domain-relevant text data is integrated with the ASR outputs.
-	\item This approach is expected to significantly reduce the Word Error Rate (WER) without increasing the size or computational complexity of the base ASR model.
+	\item Implement FastAPI (or a lightweight custom API) to serve the ASR-to-LLM inference pipeline, returning transcribed text and generated responses.
+	\item Create a web UI designed to allow easy user audio input and display the ASR output and LLM response.
 \end{itemize}
 
-\textbf{Refinement on More Diverse Datasets}
-
+\subsection{ASR Module}
 \begin{itemize}
-	\item The model will be fine-tuned on a broader and more diverse range of speech data to improve robustness and generalization.
-	\item The datasets will include variations in accents, background noise, speech rate, and domain-specific vocabularies, such as conversational speech, technical terminology, and local dialects.
-	\item Additional training data will be sourced from publicly available corpora such as Common Voice, Switchboard, and similar datasets.
-	\item Careful fine-tuning will be performed using validation monitoring and early stopping to prevent overfitting, given the limited capacity of the model.
-	\item The overall goal is to enhance the stability of the ASR system in real-world scenarios while preserving its lightweight design.
+	\item The current system employs greedy decoding for simplicity and speed; however, we are exploring alternative decoding strategies such as beam search with language model fusion to improve transcription accuracy and reduce Word Error Rate (WER).
+	\item The remaining task is to perform small-scale fine-tuning to yield slightly better transcription results and reduce Word Error Rate (WER).
 \end{itemize}
 
 \subsection{Small Language Model}

@@ -338,25 +338,6 @@ sequences, CTC performs alignment locally at each time step. This local alignmen
 strategy avoids scanning the entire sequence during decoding, leading to improved
 computational efficiency, especially for long input sequences.
 
-
-\subsubsection{Beam Search Decoder}
-In non-streaming ASR systems, once the features of a whole audio input are processed by the encoder-decoder model, the final step is to generate the most likely transcription. Instead of selecting the highest-probability word at each step(greedy decoding), this project utilizes the Beam Search decoding algorithm to improve the contextual accuracy of the output.
-
-Beam search is an approximate search method that visits the multiple possible output sequences parallely. It is a way to try many possible word sequences at the same time. It keeps the top k best guesses at each step. Then it looks at all the possible next words for each guess and keeps only the best k sequences based on their total probability.
-
-\begin{equation}
-\hat{Y} = \arg\max_{Y \in \mathcal{B}} \log P(Y \mid X)
-\end{equation}
-
-\textbf{Where:}
-\begin{itemize}
-    \item $\hat{Y}$ is the final predicted output sequence.
-    \item $X$ is the input (e.g., audio features).
-    \item $Y$ is a candidate output sequence.
-    \item $\mathcal{B}$ is the set of top $k$ hypotheses maintained at each step (beam size).
-    \item $P(Y \mid X)$ is the conditional probability of the sequence $Y$ given input $X$.
-\end{itemize}
-
 \subsubsection{AdamW Optimizer}
 AdamW is an improvement over the traditional Adam optimizer, as it decouples the
 weight decay term from the gradient-based parameter updates, thereby enabling more
@@ -387,43 +368,34 @@ better convergence behavior and improved generalization compared to the standard
 Adam optimizer, especially when training transformer-based models with large batch
 sizes and long input sequences.
 
-\subsubsection{Noam Annealing}
-
-Noam annealing is a learning-rate scheduling strategy introduced in
-\emph{Attention Is All You Need} by Vaswani et al.~(2017) for training Transformer
-models. The schedule is specifically designed to complement adaptive optimizers
-such as Adam by avoiding the need for conventional learning-rate decay schemes.
-
-The Noam schedule combines an initial linear warmup phase with an inverse square
-root decay, defined as:
+\subsubsection{Cosine Annealing}
+Cosine annealing is a non-linear learning rate-scheduling method, common in fine-tuning deep neural networks, and widely used to fine-tune pre-trained models of speech recognition, such as FastConformer. As compared to aggressive decay schemes, cosine annealing progressively decreases the learning rate according to a cosine curve, beneficial to maintaining knowledge acquired in the pre-trained weights but enabling a controlled adaptation to the target domain.
+In the case of fine-tuning, the model parameters are already in a well-trained state (e.g. using large-scale training data, such as LibriSpeech). Any initial learning rate can be catastrophically forgetful or unstable, and a fixed low initial learning rate can result in underfitting. Cosine annealing is one way to solve this problem, with an initial small learning rate gradually reduced towards zero during the fine-tuning.
 
 \begin{equation}
-	\text{lr}(t) = d_{\text{model}}^{-0.5}
-	\cdot
-	\min\left(
-	t^{-0.5},\;
-	t \cdot \text{warmup\_steps}^{-1.5}
-	\right)
+\eta_t
+=
+\eta_{\min}
++
+\frac{1}{2}
+\left(\eta_{\max} - \eta_{\min}\right)
+\left(
+1 + \cos\left(\frac{\pi t}{T}\right)
+\right)
 \end{equation}
 
-where \( t \) denotes the current training step,
-\( d_{\text{model}} \) is the model dimensionality (e.g., embedding size), and
-\( \text{warmup\_steps} \) is a predefined hyperparameter.
+\begin{itemize}
+  \item $\eta_t$: learning rate at step or epoch $t$
+  \item $\eta_{\max}$: initial (maximum) learning rate
+  \item $\eta_{\min}$: minimum learning rate
+  \item $t$: current step or epoch, $0 \leq t \leq T$
+  \item $T$: total number of steps or epochs
+\end{itemize}
 
-During the warmup phase, the learning rate increases linearly with the training
-steps, which helps stabilize optimization when parameters are randomly initialized.
-After the warmup period, the learning rate decays proportionally to \( t^{-0.5} \),
-allowing for smoother convergence and improved generalization.
-
-Noam annealing provides stable optimization dynamics in architectures such as
-FastConformer that rely heavily on self-attention and convolutional blocks. When
-combined with optimizers like Adam or AdamW, this scheduling strategy effectively
-balances rapid initial learning with gradual refinement, making it a widely adopted
-choice for transformer-based speech and language models.
-
-
-\subsubsection{LM Fusion}
-LM fusion works by adding a language model trained separately to improve how the machine transcribes what is spoken. An acoustic model is used in traditional ASR to make the audio into phonetic or word sequences and the language model adds extra knowledge, like grammar and word chances, to make the result clearer. LM fusion fuses different models, often applying shallow fusion, deep fusion or cold fusion. Shallow fusion works by combining the scores from the LM with the output from the ASR during the decoding stage, most often with log-linear techniques. In deep fusion, the LM’s hidden states join with the features in the ASR encoder and cold fusion trains the ASR model alongside a pre-trained LM to make their representations match. The LM makes it possible to understand longer and complex sentences which decreases mistakes in confusing or poor-quality audio and gives a better overall result.
+\subsubsection{Greedy Decoding}
+Greedy batch decoding which is an efficient inference strategy is used to perform transcription which is typically used in Connectionist Temporal Classification (CTC) based Automatic Speech Recognition (ASR) systems. Greedy decoding chooses the most likely token at a time step without one looking at other hypotheses or context. This process can be optimized by the so-called batch (greedy\_batch) variant, which applies parallelized decoding of many audio samples but in that instance to one file with batch\_size=1 to be compatible and to have slight efficiency improvements.
+Greedy decoding, in contrast to more advanced approaches like beam search, does not have a pool of candidate sequences, and thus is unable to combine external knowledge such as language models. It consequently can achieve low latency and high performance, but can result in lower fluent or grammatically irregular outputs, notably under noisy environments, or on ambivalent acoustic inputs. The method is based on the fact that the model (here a FastConformer) is only able to directly decode audio features into subword units (BPE tokens) and then decodes without rescoring or language improvement.
+Therefore, it is a system that gives more focus to computational performance and simplicity than to the linguistic quality, so that it can be used in real-time-sensitive applications or in other situations where speed is paramount and minor mistakes in the transcription are tolerable.
 
 \subsubsection{Softmax Function}
 Softmax function helps convert raw logits from the output layer into a distribution of probabilities for the target vocabulary. This means the model creates probabilities for every output token (such as phonemes, characters or words) and, during decoding, it can pick the most likely sequence.
