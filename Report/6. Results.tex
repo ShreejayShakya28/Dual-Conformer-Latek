@@ -7,6 +7,14 @@ The fine-tuned model has only 13.2 million parameters, which is about 4x to 8x t
 
 The achieved WER of 6.14\% per cent is higher than the performance of higher-ranking models, most of which use three to eight times the number of parameters and large amounts of data augmentation, nevertheless, it is a strong performance-per-parameter trade-off. In the case of a situation where constraints in model size, power consumption, or real-time response are involved, the existing model provides a realistically compromised state. The use of a CTC-BPE hybrid output scheme avoids the use of outside language models during decoding, which simplifying the scheme, rather than the many transducer or attention-based models, retains a reasonable degree of sub-word level generalization.
 
+The WER of the model can be further improved to 4.08\% when using greedy decoding, a relatively inexpensive method of choosing the most likely token at each iteration without using a beam search or outside language model rescoring. The only difference is that this can be seen in the red dashed line (Overall WER: 4.08\%), much lower than the green dashed line that shows the average WER (4.49\%), across utterances, shows that not only does greedy decoding increase average accuracy, but also makes performance less varied. This finding highlights the strength of the CTC-BPE hybrid output layer: it is simple with limited decoder footprint, but it produces highly competitive transcription quality, particularly when the factors of inference constraints are important and marginal gains in complex modes of decoding are traded in at the cost of latency and compute efficiency.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/WER_LibriSpeech.png}
+	\caption{WER on LibriSpeech}
+\end{figure}
+
 \begin{table}[H]
 	\centering
 	\begin{tabular}{|l|c|c|}
@@ -23,7 +31,8 @@ The achieved WER of 6.14\% per cent is higher than the performance of higher-ran
 		LSTM Transducer & 2.23 & 40M--80M \\
 		Conformer (M) & 2.0 & 50M \\
 		Stateformer & 1.76 & 40M--60M \\
-		Our Model & 6.14 & 13.2M \\
+		Fast Conformer & 6.14 & 13.2M \\
+		Fast Conformer with Greedy Decoding & 4.08 & 13.2M \\
 		\hline
 	\end{tabular}
 	\caption{Word Error Rate (WER) and parameter count of models trained on the LibriSpeech dataset}

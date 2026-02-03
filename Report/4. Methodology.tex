@@ -8,8 +8,11 @@
     \caption{Proposed System Architecture}
 \end{figure}
 
-Our system pipeline begins with audio input which is user's speech. The input should be in English language. The audio is then passed to ASR module, which performs feature extraction (Mel Spectrograms), then it used our neural network ie Conformer to convert the audio into text transcription. Once the spoken input is transcribed completely, then the text is passed to a Small Language Model (SLM). The SLM is fine tuned to customized dataset optimised for local inference and response generation. The SLM interprets the meaning, context and intent behind 
-transcribed input and then generates coherent, text response. Finally, the response is returned to user using Text-To-Speech (TTS) module in accordance to user input prompt. Text response is also directly available as a output form. 
+The system pipeline starts with spoken audio input from the user, which is expected to be in English. The audio signal is first processed by the Automatic Speech Recognition (ASR) module, where acoustic feature extraction is performed using Mel spectrograms. These features are then passed to a Conformer-based neural network, which converts the speech signal into a textual transcription.
+
+Once transcription is completed, the resulting text is forwarded to a Small Language Model (SLM). The SLM is fine-tuned on a custom dataset and optimized for local inference and response generation. It analyzes the transcription to infer the underlying intent, context, and semantics, and generates a coherent textual response.
+
+Finally, the generated text response is converted into speech using a Text-to-Speech (TTS) module based on the user's prompt configuration. The text response is also provided directly as an output. 
 
 \subsection{Automatic Speech Recognition}
 \subsubsection{Proposed Architecture of ASR}
@@ -440,7 +443,7 @@ Word Error Rate (WER) is the most popular metric used to evaluate the performanc
 
 
 \begin{equation}
-	\text{WER} = /frac{S+D+I}{N}
+	\text{WER} = \frac{S+D+I}{N}
 \end{equation}
 
 where,
