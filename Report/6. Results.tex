@@ -11,7 +11,7 @@ The WER of the model can be further improved to 4.08\% when using greedy decodin
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/WER_LibriSpeech.png}
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/WER_LibriSpeech.png}
 	\caption{WER on LibriSpeech}
 \end{figure}
 
@@ -31,8 +31,8 @@ The WER of the model can be further improved to 4.08\% when using greedy decodin
 		LSTM Transducer & 2.23 & 40M--80M \\
 		Conformer (M) & 2.0 & 50M \\
 		Stateformer & 1.76 & 40M--60M \\
-		Fast Conformer & 6.14 & 13.2M \\
-		Fast Conformer with Greedy Decoding & 4.08 & 13.2M \\
+		\textbf{Fast Conformer} & \textbf{6.14} & \textbf{13.2M} \\
+		\textbf{Fast Conformer with Greedy Decoding} & \textbf{4.08} & \textbf{13.2M} \\
 		\hline
 	\end{tabular}
 	\caption{Word Error Rate (WER) and parameter count of models trained on the LibriSpeech dataset}
@@ -66,7 +66,7 @@ These examples demonstrate that the model accurately captures most of the semant
 \subsubsection{Training Dynamics}
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/EpochTrain_Loss.png}
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochTrain_Loss.png}
 	\caption{Epoch-wise Training Loss}
 \end{figure}
 
@@ -74,20 +74,20 @@ Training Loss (Figure 6-1) decreases steadily from 36.2 to 31.2, indicating cons
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/EpochVal_Loss.png}
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochVal_Loss.png}
 	\caption{Epoch Wise Validation Loss}
 \end{figure}
 Validation Loss (Figure 6-2) shows a similar downward trend, reaching 37.9 at epoch 7, with only minor fluctuations (e.g., a small uptick at epoch 5), suggesting good generalization without severe overfitting.
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/BestVal_Loss.png}
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/BestVal_Loss.png}
 	\caption{Best Validation Loss (Cumulative Minimum)}
 \end{figure}
 The Best Validation Loss (Figure 6-3) is monotonically non-increasing, confirming that the best checkpoint improves over time.
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{Image PDFs/shaswot-graphs/EpochGradient_Norm.png}
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochGradient_Norm.png}
 	\caption{Gradient Norm per Epoch}
 \end{figure}
 The Gradient Norm (Figure 6-4) drops rapidly in early epochs and stabilizes around 180–185, signaling convergence and stable optimization. Collectively, these curves confirm a stable, well-behaved training process with no signs of divergence or instability.
@@ -147,7 +147,7 @@ The BLEU-1 score checks for only single word overlaps while the BLEU-2 and highe
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{Image PDFs/blue.png}
+    \includegraphics[width=\linewidth]{Images/SLM/Results/blue.png}
     \caption{BLEU Score}
 \end{figure}
 
@@ -174,7 +174,7 @@ ROUGE score is another evaluation metric used for NLP and text-generation relate
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{Image PDFs/rouge.png}
+    \includegraphics[width=\linewidth]{Images/SLM/Results/rouge.png}
     \caption{BLEU Score}
 \end{figure}
 
@@ -199,7 +199,7 @@ ROUGE score is another evaluation metric used for NLP and text-generation relate
 
 \begin{figure}[H]
 	\centering
-	\includegraphics[width=\linewidth]{Image PDFs/blueVsRouge.png}
+	\includegraphics[width=\linewidth]{Images/SLM/Results/blueVsRouge.png}
 	\caption{BLEU vs ROUGE scores for different n-grams}
 \end{figure}
 

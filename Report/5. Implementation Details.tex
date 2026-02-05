@@ -52,17 +52,6 @@ In order to to feed Conformer, we need to pre-process raw audio data. We employe
 
 Sliding window approach is applied to cut the raw audio waveform into overlapping frames. The windowing process is specified by the following parameters:
 
-%\textbf{--- Code Needs Update Here ----}
-%\begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = Mel Spectogram Transformer]
-%    self.mel_transform = T.MelSpectrogram(
- %       sample_rate=16000,
- %       n_fft=512,
- %       hop_length=160,
- %       n_mels=80
-  %  )
-   % self.db_transform = T.AmplitudeToDB()
-% \end{lstlisting}
-
 \begin{table}[H]
 \caption{Audio Feature Extraction Parameters}
 \centering
@@ -89,19 +78,12 @@ Padding Value ($pad\_value$) & 0.0 \\
 
 The magnitude spectrogram is converted into a Mel-scale representation through a bank of triangular filters in order to highlight perceptually interesting frequencies and down sample. Mel Filters are used where each spectrogram is projected in 80 Mel filters creating a compact representation. Logarithmic scaling is performed so that the filter bank is changed to a scale closer to human auditory perception and present better numerical stability during training.
 
-
-% \begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = Augmentation with frequency and time masking parameters]
-%     self.spec_augment = torch.nn.Sequential(
-%         T.FrequencyMasking(freq_mask_param=25),
-%         T.TimeMasking(time_mask_param=25)
-% \end{lstlisting}
-
 \subsubsection{Spectrogram Augmentation}
 
 The graph 5-1 displays the raw audio waveform of the first sample from a random batch, it is visualized as a continuous line plot where the horizontal axis represents the time in terms of the audio frames and the vertical axis represents the corresponding amplitude. The waveform appears dense and oscillatory, with various fluctuations indicating complex sound signals such as speech. This type of waveform is obtained by loading the audio file using torchaudio.load(), which returns the waveform and sampling rate, the waveform tensor is then squeezed and converted to NumPy array for plotting using matplotlib.plot().
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Waveform.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Waveform.png}
     \caption{Raw Audio Waveform}
     \label{fig:Raw Audio Waveform}
 \end{figure}
@@ -109,7 +91,7 @@ The graph 5-1 displays the raw audio waveform of the first sample from a random 
 The graph 5-2 shows a Mel spectrogram of the first audio sample, visualized using a color map. The spectrogram represents the frequency over time, with brighter colors indicating higher magnitudes and darker regions indicating lower magnitudes of energy. This Spectrogram is derived from the raw audio waveform plotted in the previous image, which was processed using short-time Fourier transform (STFT).
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Mel Spectogram.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Mel Spectogram.png}
     \caption{Mel Spectrogram Of Raw Audio}
     \label{fig:Mel Spectogram Of Raw Audio}
 \end{figure}
@@ -117,7 +99,7 @@ The graph 5-2 shows a Mel spectrogram of the first audio sample, visualized usin
 This is the Log Mel Spectrogram of an audio sample. Each value of energy magnitude at mel frequency bin for a particular time frame is calculated and log is applied.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Log_Mel_Spec.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Log_Mel_Spec.png}
     \caption{Log Mel Spectrogram}
     \label{fig:Log Mel Spectrogram}
 \end{figure}
@@ -125,7 +107,7 @@ This is the Log Mel Spectrogram of an audio sample. Each value of energy magnitu
 This graph 5-4 shows the frequency masking of a log mel spectrogram. The values of some frequency band is masked (hidden) at random. It simulates missing parts in audio. It forces the model to not rely too much on specific frequency bands. The model learns to focus on broader context and other frequency features, not just one narrow band.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Freq_Mask_20.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Freq_Mask_20.png}
     \caption{Spec Augmentation with Frequency Mask = 20}
     \label{fig:Spec Augmentation with Frequency Mask = 20}
 \end{figure}
@@ -133,7 +115,7 @@ This graph 5-4 shows the frequency masking of a log mel spectrogram. The values 
 The graph 5-5 shows the time masking of a log mel spectrogram. The values of some continuous time frames are masked( hidden) at random. It helps the model to fill in gaps or use information from before and after the masked time segment. It makes the model not rely too much on specific time parts of the audio (like certain words or sounds).
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Time_Mask_20.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Time_Mask_20.png}
     \caption{Spec Augmentation with Time Mask = 20}
     \label{fig:Spec Augmentation with Time Mask = 20}
 \end{figure}
@@ -141,7 +123,7 @@ The graph 5-5 shows the time masking of a log mel spectrogram. The values of som
 The graph 5-6 shows the time warping of a log mel spectrogram. Time Warping means stretching or compressing parts of the spectrogram along the time axis. It changes the timing of events in the audio without changing the contents. It helps us simulate the various speaking speeds. It improves the ability to generalize across different speakers and speech styles.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Time_Warp_20.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Time_Warp_20.png}
     \caption{Spec Augmentation with Time Warp = 20}
     \label{fig:Spec Augmentation with Time Warp = 20}
 \end{figure}
@@ -149,7 +131,7 @@ The graph 5-6 shows the time warping of a log mel spectrogram. Time Warping mean
 The graph 5-7 shows the combination of above 3 augmentation spectrograms. It simulates the different gaps in speech, the rate of speaking and helps the model to not rely on particular frequency bands.
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/Spec/Aug_All_20.png}
+    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Aug_All_20.png}
     \caption{Spec Augmentation with Time Warp, Frequency and Time Masking = 20}
     \label{fig:Spec Augmentation with Time Warp, Frequency and Time Masking = 20}
 \end{figure}
@@ -452,7 +434,7 @@ Self attention mechanism does not have a notion of position or order of tokens w
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{Image PDFs/Embedding.pdf}
+    \includegraphics[width=\linewidth]{Images/SLM/Implementation Details/Embedding.pdf}
     \caption{Token and Positional Embedding}
 \end{figure}
 
@@ -461,7 +443,7 @@ The Multi-Head Attention module uses a casual scaled dot product attention mecha
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Image PDFs/AttentionMechanism.pdf}
+    \includegraphics[width=1\linewidth]{Images/SLM/Implementation Details/AttentionMechanism.pdf}
     \caption{Attention Mechanism}
     \label{fig:Attention Mechanism}
 \end{figure}
@@ -469,9 +451,9 @@ The Multi-Head Attention module uses a casual scaled dot product attention mecha
 \begin{itemize}
     \item \textbf{Initialization and projection: }
     The input tensor has shape $(B, T, d_{in})$ where $B$ is the batch size and $T$ is the sequence length. The output dimension $d_{out}$ should be divisible by the number of heads $h$, i.e.,
-        $
-        d_k = \frac{d_{out}}{h}
-        $
+    $
+      d_k = \frac{d_{out}}{h}
+    $
     The first three linear layers $W_{\text{query}}, W_{\text{key}}, W_{\text{value}}$ are initialized to project input embeddings into query, key, and value vectors. A causal mask using an upper triangular matrix is applied, ensuring that during training the model attends only to previous positions, preventing information leakage.
 
     $$Q = XW_Q \quad K = XW_K \quad V = XW_V$$
@@ -528,6 +510,3 @@ This feed network uses the Gaussian Error Linear Unit (GELU) activation. It intr
 
 \textbf{Transformer block and model}\\
 The first input goes through layer normalization. The feed forward part consists of two linear layers. The first expands the embedding dimension to 4 times its size, applies GELU and projects the original embedding dimension towards the second linear layer. Which is followed by multi-head attention sub-layer. A dropout is applied to the attention output and a residual connection adds a shortcut. This process is repeated multiple times to form a core transformer stack. The model begins with a token embedding layer and positional embedding of the same dimensions. Which then flows to the stack of n\_layers of the transformer block. A last layer normalization is applied and linear output head is used that projects the embeddings to a vocabulary size. The result logits represents unnormalized probabilities over next token for each position in the sequence.
-
-
-% \subsubsection{Model Evaluation}

@@ -4,7 +4,7 @@
 \subsection{Proposed System Architecture}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-SuperMainArchitecture.drawio.pdf}
+    \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-SuperMainArchitecture.drawio.pdf}
     \caption{Proposed System Architecture}
 \end{figure}
 
@@ -18,7 +18,7 @@ Finally, the generated text response is converted into speech using a Text-to-Sp
 \subsubsection{Proposed Architecture of ASR}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-Main Architecture.drawio.pdf}
+    \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-Main Architecture.drawio.pdf}
     \caption{Proposed Architecture of ASR}
 \end{figure}
 
@@ -60,14 +60,6 @@ In the stage of convolutional subsampling, Conformer is particularly useful for 
 While frames separated by 10ms include a lot of details, this level of detail is usually not important for further use in the speech processing. The model pays attention to important patterns for recognition when data is subsampled to 40ms. Moreover, computational costs are greatly reduced because each layer of the Conformer gets smaller input vectors by working on trimmed parts of the sequences.
 
 
-% Progressive Downsampling
-% \subsubsection{Progressive Downsampling}
-% In Automatic Speech Recognition (ASR), progressive downsampling works by making the time resolution lower in the input features but keeping necessary details needed for transcription. It includes lowering the number of dimensions in the feature data as it passes through layers in a deep neural network like a convolutional or transformer-based model to find patterns in speech. When downsampling is applied at several layers, the model reduces the length of the input sequence which quickens calculation and also saves memory, yet crucial parts of the audio and words are retained. Balancing the model’s accuracy and how fast it runs, low-resolution features help by recognizing phonemes or words in the speech.
-% Yesko Formula cha
-% \begin{equation}     
-% yt = f\left( \sum{i=0}^{k-1} wi \cdot x{t-s+i} \right) 
-% \end{equation}
-
 \subsubsection{Linear}
 
 Conformer uses a linear layer in the model after the first process of convolutional subsampling to map the newly subsampled features into a larger space. This step is required because it brings the feature dimensions to the size of the hidden layers used by Transformer and convolutional modules. To explain this, the linear block picks the results from the downsampling, which lowers the time resolution and extracts local details, and completes the process by adding an extra layer to increase its dimensions. Doing this makes sure the achieved representation is able to hold detailed acoustic details and blends well with the self-attention and feed-forward modules from the Conformer design. This kind of design gives a balance between performance and calculations, helping the Conformer perform well in speech recognition.
@@ -82,7 +74,7 @@ In the inference part, dropout is not utilized, so the model can use all its dat
 \textbf{Conformer Architecture}
     \begin{figure}[H]
         \centering
-        \includegraphics[scale=1]{Image PDFs/ASR/ASR-ConformerBlock.drawio.pdf}
+        \includegraphics[scale=1]{Images/ASR/Methodology/ASR-ConformerBlock.drawio.pdf}
         \caption{Conformer Architecture}
     \end{figure}
 
@@ -96,7 +88,7 @@ All FFNs start off with layer normalization , ensuring that the mean and varianc
 
     \begin{figure}[H]
         \centering
-        \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-MultiHeadedSelfAttentionModule.drawio.pdf}
+        \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-MultiHeadedSelfAttentionModule.drawio.pdf}
         \caption{Block Diagram of Multi-Headed Self Attention Module Architecture}
     \end{figure}
 
@@ -104,77 +96,14 @@ All FFNs start off with layer normalization , ensuring that the mean and varianc
 
     \begin{figure}[H]
         \centering
-        \includegraphics[scale=1]{Image PDFs/ASR/ASR-ResMHA.drawio.pdf}
+        \includegraphics[scale=1]{Images/ASR/Methodology/ASR-ResMHA.drawio.pdf}
         \caption{Block Diagram of Multi-Head Self Attention with Relative Positional Embedding}
     \end{figure}
-
-% \textbf{Linear Projections}\\
-% Input embeddings $ {X} \in \mathbb{R}^{n \times d_{\text{model}}}$ are projected into queries ($ {Q}$), keys ($ {K}$), and values ($ {V}$) using learnable weight matrices for each head $i$:
-%     \begin{equation}
-%          {Q}_i =  {X}  {W}_i^Q, \quad
-%          {K}_i =  {X}  {W}_i^K, \quad
-%          {V}_i =  {X}  {W}_i^V
-%     \end{equation}
-
-% \textbf{Compute Attention Logits:}\\
-% Scaled dot-product attention logits are computed for each head $i$. For layer $l$, residual logits $ {R}_i^{l-1}$ from the previous layer are added:
-    
-% The residual term $ {R}_i^{l-1}$ propagates attention patterns from layer $l-1$ to $l$, promoting stability and reducing vanishing gradients. For $l = 1$, $ {R}_i^0 = 0$.
-    
-% \begin{equation}
-%     {A}_i^l = \frac{{Q}_i ({K}_i)^\top}{\sqrt{d_k}} + {R}_i^{l-1}
-% \end{equation}
-
-% \textbf{Attention Weights and Output}\\
-%     Attention weights $\boldsymbol{\alpha}_i$ are obtained via softmax, and the output for head $i$ is computed:
-%     \begin{equation}
-%         \boldsymbol{\alpha}_i = \text{softmax}( {A}_i^l), \quad
-%         \text{head}_i = \boldsymbol{\alpha}_i  {V}_i
-%     \end{equation}
-
-% \textbf{Multi-Head Concatenation:}\\
-% Outputs from $h$ heads are concatenated and projected:
-%     \begin{equation}
-%         \text{MultiHead}( {Q},  {K},  {V}) = \text{Concat}(\text{head}_1, \dots, \text{head}_h)  {W}^O
-%     \end{equation}
-
-% \textbf{Add \& Normalize (Post-Attention):}\\
-%     A residual connection is applied, followed by Layer Normalization.
-%     Residual connections mitigate gradient degradation, while LayerNorm stabilizes training.
-%     \begin{equation}
-%          {Y} = \text{LayerNorm}( {X} + \text{MultiHead}( {Q},  {K},  {V}))
-%     \end{equation}
-
-% \textbf{Feed-Forward Network (FFN):}\\
-%     $ {Y}$ is processed by a position-wise FFN with ReLU activation:
-%     \begin{equation}
-%         \text{FFN}( {Y}) = \max(0,  {Y}  {W}_1 +  {b}_1)  {W}_2 +  {b}_2
-%     \end{equation}
-
-% \textbf{Add \& Normalize (Post-FFN):}\\
-%     Another residual connection and LayerNorm:
-%     \begin{equation}
-%          {Z} = \text{LayerNorm}( {Y} + \text{FFN}( {Y}))
-%     \end{equation}
-
-% \textbf{Store Residual Logits:}\\
-%     Attention logits $ {A}_i^l$ are stored as residuals for the next layer:
-    
-%     Storing $ {R}_i^l$ enables:
-%     \begin{itemize}
-%         \item Information flow across layers.
-%         \item Refinement of attention patterns (e.g., layer $l + 1$ can amplify/suppress prior patterns).
-%         \item Improved modeling of long-range dependencies.
-%     \end{itemize}
-    
-%     \begin{equation}
-%          {R}_i^l =  {A}_i^l
-%     \end{equation}
 
 \textbf{Convolution Module}
     \begin{figure}[H]
         \centering
-        \includegraphics[scale=1]{Image PDFs/ASR/ASR-Convolution Module.drawio.pdf}
+        \includegraphics[scale=1]{Images/ASR/Methodology/ASR-Convolution Module.drawio.pdf}
         \caption{Block Diagram of Convolution Module}
     \end{figure}
     \begin{enumerate}
@@ -190,13 +119,13 @@ All FFNs start off with layer normalization , ensuring that the mean and varianc
 
         \begin{figure}[H]
             \centering
-            \includegraphics[width=\linewidth]{Image PDFs/ASR/glu_activation.png}
+            \includegraphics[width=\linewidth]{Images/ASR/Methodology/glu_activation.png}
             \caption{Graph of GLU activation}
         \end{figure}
         
         \begin{figure}[H]
             \centering
-            \includegraphics[width=\linewidth]{Image PDFs/ASR/ASR-GLU.drawio.pdf}
+            \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-GLU.drawio.pdf}
             \caption{Block Diagram of GLU activation}
         \end{figure}
         
@@ -215,7 +144,7 @@ All FFNs start off with layer normalization , ensuring that the mean and varianc
 
         \begin{figure}[H]
             \centering
-            \includegraphics[width=\linewidth]{Image PDFs//ASR/swish_activation.png}
+            \includegraphics[width=\linewidth]{Images/ASR/Methodology/swish_activation.png}
             \caption{Graph of Swish Activation}
         \end{figure}
 
@@ -425,4 +354,3 @@ where,
 	\item I = Number of insertions (extra words)
 	\item N = Total number of words in the reference
 \end{itemize}
-
