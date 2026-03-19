@@ -17,6 +17,8 @@
 
 # Output PDFs (optional – see note below)
 *.pdf
+!Images/ASR/Methodology/*.pdf
+!Images/SLM/Methodology/*.pdf
 
 # OS junk
 .DS_Store
