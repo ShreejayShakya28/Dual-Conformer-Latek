@@ -1,367 +1,370 @@
 \newpage
 \section{\MakeUppercase{Implementation Details}}
+% \subsection{ASR}
 \subsection{ASR}
-\subsubsection{Dataset Preparation}
-The LibriSpeech corpus is hierarchically organized into a directory structure to
-facilitate efficient storage and retrieval. In the LibriSpeech 100-hour split
-(\texttt{train-clean-100}), the root directory contains subdirectories named after
-speaker IDs (e.g., \texttt{19}, \texttt{26}). Each speaker directory further contains
-chapter-level subdirectories (e.g., \texttt{198}, \texttt{261}), which store short
-audio utterances in lossless \texttt{.flac} format. These utterances typically range
-from 1 to 10 seconds in duration, are sampled at 16~kHz with 16-bit depth, and use
-lossless compression. Each chapter directory is accompanied by a transcript file
-(\texttt{.txt}) that contains the transcriptions for all utterances in that chapter.
 
-For ease of implementation during model development, the \texttt{torchaudio}
-library in PyTorch provides the \texttt{LIBRISPEECH} dataset class, which
-automatically parses this directory structure and returns audio waveforms together
-with the corresponding metadata.
+\subsubsection{FastConformer-CTC-BPE}
 
-In addition, several modern speech recognition toolkits such as NVIDIA NeMo,
-ESPnet, and Fairseq rely on manifest files to organize training data. A manifest is
-typically stored in the JSON Lines (JSONL) format, where each line corresponds to a
-single utterance and contains the following fields:
+\textbf{Model Architecture and PEFT Configuration}
 
-\begin{itemize}
-	\item \texttt{audio\_filepath}: path to the \texttt{.flac} audio file,
-	\item \texttt{duration}: duration of the utterance in seconds,
-	\item \texttt{text}: the cleaned transcript of the utterance.
-\end{itemize}
+The NVIDIA NeMo FastConformer-CTC-BPE model was used as the base automatic speech recognition system in the experiments. The model follows an encoder-decoder architecture that uses Connectionist Temporal Classification (CTC) loss for sequence-to-sequence mapping. The encoder is a Conformer-based model with approximately 13 million parameters, while the decoder is a convolutional ASR decoder with 181,000 parameters. The total number of parameters in the base model is 13,204,721.
 
-To construct a manifest file for the LibriSpeech \texttt{train-clean-100} split, the
-transcript (\texttt{.txt}) files associated with each chapter can be read and mapped
-to their corresponding \texttt{.flac} audio files using the utterance identifiers.
-The resulting entries are written sequentially to a manifest file (e.g.,
-\texttt{librispeech\_train\_clean\_100.json}). This representation enables faster
-randomized access, supports dynamic batching, and allows seamless integration with
-data loaders that are independent of PyTorch-specific dataset classes.
-
-\begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = LibriSpeech Dataset Downloader]    
-    from torchaudio.datasets import LIBRISPEECH
-    
-    dataset = LIBRISPEECH(root="data", url="train-clean-100",
-     download=True)
-    waveform, sample_rate, transcript, speaker_id, chapter_id,
-     utterance_id = dataset[0]
-    
-\end{lstlisting}
-
-\subsubsection{Computing Mel Spectrogram}
-
-In order to to feed Conformer, we need to pre-process raw audio data. We employed feature extraction pipeline which transforms raw audio waveforms in log Mel Spectrograms. This process is important in limiting the large dimensionality of input signal. 
-
-Sliding window approach is applied to cut the raw audio waveform into overlapping frames. The windowing process is specified by the following parameters:
+To achieve parameter-efficient fine-tuning, the NeMo adapter-based PEFT architecture was used. This approach is supported by NeMo as an alternative to LoRA for Conformer-based architectures. Adapter modules were inserted only into the encoder component, while all other parameters were kept frozen during training. Each adapter used a linear bottleneck architecture under the configurations shown in Table~\ref{tab:fastconformer_adapter}. This design reduced the number of trainable parameters to only 50,688, which corresponds to 0.3839\% of the total model parameters.
 
 \begin{table}[H]
-\caption{Audio Feature Extraction Parameters}
+\caption{Adapter Configuration Parameters}
+\label{tab:fastconformer_adapter}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Configuration Value} \\
+\hline
+Target Module & Encoder \\
+Adapter Dimension & 8 \\
+Adapter Dropout & 0.25 \\
+Activation Function & Swish \\
+Normalization Position & Pre-norm \\
+Input Feature Size & 176 \\
+Trainable Parameters & 50,688 \\
+Trainable Percentage & 0.3839\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Dataset and Preprocessing}
+
+Training was conducted on a custom English ASR dataset written in NeMo manifest format and stored as JSONL files. The dataset was divided into training, validation, and test subsets. All audio samples were processed at a sampling rate of 16,000 Hz. Duration filtering was applied to remove utterances shorter than 0.5 seconds and longer than 20 seconds.
+
+The data loader used seven worker processes with pinned memory enabled to improve GPU data transfer efficiency. Silence trimming was disabled in order to preserve natural speech characteristics. Table~\ref{tab:fastconformer_dataset} presents the statistical distribution of the dataset splits.
+
+\begin{table}[H]
+\caption{Dataset Split Statistics}
+\label{tab:fastconformer_dataset}
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Split} & \textbf{Samples} & \textbf{Duration} & \textbf{Average Words} \\
+\hline
+Train & 4,859 & 17.03 hours & 35.26 \\
+Validation & 571 & 1.99 hours & 35.26 \\
+Test & 287 & 0.98 hours & 35.10 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Training Configuration}
+
+Training was performed using PyTorch Lightning together with the NeMo toolkit. Optimization was carried out using AdamW with decoupled weight decay. A cosine annealing scheduler was used to control the learning rate, together with a warmup phase to stabilize the initial training dynamics. Mixed-precision training was enabled to reduce memory usage and accelerate computation on the available GPU hardware. The training hyperparameters are summarized in Table~\ref{tab:fastconformer_train}.
+
+\begin{table}[H]
+\caption{Training Hyperparameters}
+\label{tab:fastconformer_train}
 \centering
 \begin{tabular}{|l|l|}
 \hline
 \textbf{Parameter} & \textbf{Value} \\
 \hline
-Sample Rate ($sample\_rate$) & 16000 \\
-Normalization ($normalize$) & per\_feature \\
-Window Size ($window\_size$) & 0.025 \\
-Window Stride ($window\_stride$) & 0.01 \\
-Window Function ($window$) & hann \\
-Number of Features ($features$) & 80 \\
-FFT Size ($n\_fft$) & 512 \\
-Log Scaling ($log$) & True \\
-Frame Splicing ($frame\_splicing$) & 1 \\
-Dither ($dither$) & $1\times10^{-5}$ \\
-Padding To ($pad\_to$) & 0 \\
-Padding Value ($pad\_value$) & 0.0 \\
+Maximum Epochs & 12 \\
+Batch Size & 8 \\
+Gradient Accumulation Steps & 2 \\
+Learning Rate & $1\times10^{-4}$ \\
+Minimum Learning Rate & $1\times10^{-6}$ \\
+Weight Decay & $5\times10^{-2}$ \\
+Adam Betas & (0.9, 0.98) \\
+Warmup Ratio & 0.1 \\
+Gradient Clipping & 1.0 \\
+Precision & 16-bit Mixed (AMP) \\
+Learning Rate Scheduler & Cosine Annealing \\
 \hline
 \end{tabular}
 \end{table}
 
+\textbf{Data Augmentation}
 
-The magnitude spectrogram is converted into a Mel-scale representation through a bank of triangular filters in order to highlight perceptually interesting frequencies and down sample. Mel Filters are used where each spectrogram is projected in 80 Mel filters creating a compact representation. Logarithmic scaling is performed so that the filter bank is changed to a scale closer to human auditory perception and present better numerical stability during training.
+SpecAugment was applied during training to improve model robustness against acoustic variability. This augmentation strategy helps the model generalize better to unseen acoustic conditions by masking selected regions of the spectrogram. The frequency and time masking configurations are shown in Table~\ref{tab:fastconformer_aug}.
 
-\subsubsection{Spectrogram Augmentation}
-
-The graph 5-1 displays the raw audio waveform of the first sample from a random batch, it is visualized as a continuous line plot where the horizontal axis represents the time in terms of the audio frames and the vertical axis represents the corresponding amplitude. The waveform appears dense and oscillatory, with various fluctuations indicating complex sound signals such as speech. This type of waveform is obtained by loading the audio file using torchaudio.load(), which returns the waveform and sampling rate, the waveform tensor is then squeezed and converted to NumPy array for plotting using matplotlib.plot().
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Waveform.png}
-    \caption{Raw Audio Waveform}
-    \label{fig:Raw Audio Waveform}
-\end{figure}
-
-The graph 5-2 shows a Mel spectrogram of the first audio sample, visualized using a color map. The spectrogram represents the frequency over time, with brighter colors indicating higher magnitudes and darker regions indicating lower magnitudes of energy. This Spectrogram is derived from the raw audio waveform plotted in the previous image, which was processed using short-time Fourier transform (STFT).
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Mel Spectogram.png}
-    \caption{Mel Spectrogram Of Raw Audio}
-    \label{fig:Mel Spectogram Of Raw Audio}
-\end{figure}
-
-This is the Log Mel Spectrogram of an audio sample. Each value of energy magnitude at mel frequency bin for a particular time frame is calculated and log is applied.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Log_Mel_Spec.png}
-    \caption{Log Mel Spectrogram}
-    \label{fig:Log Mel Spectrogram}
-\end{figure}
-
-This graph 5-4 shows the frequency masking of a log mel spectrogram. The values of some frequency band is masked (hidden) at random. It simulates missing parts in audio. It forces the model to not rely too much on specific frequency bands. The model learns to focus on broader context and other frequency features, not just one narrow band.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Freq_Mask_20.png}
-    \caption{Spec Augmentation with Frequency Mask = 20}
-    \label{fig:Spec Augmentation with Frequency Mask = 20}
-\end{figure}
-
-The graph 5-5 shows the time masking of a log mel spectrogram. The values of some continuous time frames are masked( hidden) at random. It helps the model to fill in gaps or use information from before and after the masked time segment. It makes the model not rely too much on specific time parts of the audio (like certain words or sounds).
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Time_Mask_20.png}
-    \caption{Spec Augmentation with Time Mask = 20}
-    \label{fig:Spec Augmentation with Time Mask = 20}
-\end{figure}
-
-The graph 5-6 shows the time warping of a log mel spectrogram. Time Warping means stretching or compressing parts of the spectrogram along the time axis. It changes the timing of events in the audio without changing the contents. It helps us simulate the various speaking speeds. It improves the ability to generalize across different speakers and speech styles.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Time_Warp_20.png}
-    \caption{Spec Augmentation with Time Warp = 20}
-    \label{fig:Spec Augmentation with Time Warp = 20}
-\end{figure}
-
-The graph 5-7 shows the combination of above 3 augmentation spectrograms. It simulates the different gaps in speech, the rate of speaking and helps the model to not rely on particular frequency bands.
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=1\linewidth]{Images/ASR/Implementation Details/Spec/Aug_All_20.png}
-    \caption{Spec Augmentation with Time Warp, Frequency and Time Masking = 20}
-    \label{fig:Spec Augmentation with Time Warp, Frequency and Time Masking = 20}
-\end{figure}
-
-\textbf{Hyper Parameters of Spectrogram Augmentation}
 \begin{table}[H]
-\caption{Spectrogram Augmentation Parameters}
+\caption{Data Augmentation Parameters}
+\label{tab:fastconformer_aug}
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Augmentation Type} & \textbf{Count} & \textbf{Maximum Width} \\
+\hline
+Frequency Masks & 2 & 15 frequency bins \\
+Time Masks & 6 & 30 time steps \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Regularization and Checkpointing}
+
+Early stopping was based on validation Word Error Rate (WER) as the monitoring metric. Model checkpoints were saved at regular intervals, and the best-performing checkpoint was retained according to validation performance. This strategy helped reduce overfitting and ensured that the best model weights were preserved for final evaluation. The checkpointing and early stopping criteria are given in Table~\ref{tab:fastconformer_ckpt}.
+
+\begin{table}[H]
+\caption{Checkpoint and Early Stopping Configuration}
+\label{tab:fastconformer_ckpt}
 \centering
 \begin{tabular}{|l|l|}
 \hline
-\textbf{Parameter} & \textbf{Value} \\
+\textbf{Configuration} & \textbf{Value} \\
 \hline
-Frequency Masks ($freq\_masks$) & 2 \\
-Time Masks ($time\_masks$) & 5 \\
-Frequency Mask Width ($freq\_width$) & 27 \\
-Time Mask Width ($time\_width$) & 0.05 \\
+Monitor Metric & Validation WER \\
+Mode & Minimization \\
+Patience & 5 epochs \\
+Minimum Delta & 0.0 \\
+Save Top K & 1 \\
+Checkpoint Frequency & Every 1 epoch \\
 \hline
 \end{tabular}
 \end{table}
 
+\textbf{Evaluation Metrics}
 
-\subsubsection{Batching using Collate Function}
+Standard ASR evaluation metrics were used to measure model performance. Word Error Rate (WER) was computed using Levenshtein distance between reference and hypothesis word sequences. Character Error Rate (CER) was calculated using character-level Levenshtein distance. These metrics were evaluated both through the PyTorch Lightning evaluation pipeline and through offline transcription on the validation and test sets. Whitespace was preserved during text normalization so that both metrics could be computed consistently. The model achieved a best validation WER of 3.240\%.
 
-We have a collate function which operates on batch of variable length sequential item. The collate function takes a batch of sequences and applies padding to each sequence, ensuring they all match the length of the longest sequence in the batch. Additionally, the collate function outputs three components: the padded sequence, the original length of each sequence before padding, and the corresponding label for each sequence. In deep learning packages such as PyTorch, the inputs are fed in batches by data loaders. Speech data and their transcripts are normally of unequal length. This operation makes sure that all sequences in a batch have been padded to the same length making them be easily processed by the model.
-\begin{lstlisting}[language=Python,basicstyle=\footnotesize\ttfamily, caption = Collate Function]
-    def collate_fn(batch):
-        specs, transcripts,waveforms = zip(*batch)
-        max_len = max(spec.shape[-1] for spec in specs)
-        padded_specs = [
-            F.pad(spec, (0, max_len - spec.shape[-1]))
-            for spec in specs
-        ]
-        batch_specs = torch.stack(padded_specs)
-        return batch_specs, transcripts,waveform
-\end{lstlisting}
+\textbf{Software and Hardware Environment}
 
-\subsubsection{Encoder}
-\begin{enumerate}
-	
-	\item \textbf{Input Features}
-	
-	The input features are 80-dimensional and are provided to the encoder. These features are mel-spectrogram representations derived from raw audio signals and capture relevant spectral characteristics required for speech recognition.
-	
-	\item \textbf{Output Features}
-	
-	The output feature dimension is set to $-1$, meaning it remains consistent with the internal model dimension ($d_{\text{model}}$), which is 176. As a result, the encoder outputs 176-dimensional feature representations.
-	
-	\item \textbf{Number of Layers}
-	
-	The encoder consists of 16 stacked Conformer blocks. Each block integrates self-attention, convolutional modules, and feed-forward networks to effectively model both local and global sequential dependencies.
-	
-	\item \textbf{Model Dimension}
-	
-	The internal representation dimension of the encoder is set to 176. This dimension defines the size of the hidden states used throughout the model.
-	
-	\item \textbf{Subsampling Method}
-	
-	Temporal resolution reduction is achieved through strided subsampling. This method skips time steps to reduce computational cost while preserving essential information in the sequence.
-	
-	\item \textbf{Subsampling Factor}
-	
-	The input sequence length is reduced by a factor of 4. For instance, an input sequence of 100 time steps is subsampled to 25 time steps.
-	
-	\item \textbf{Subsampling Channels}
-	
-	A convolutional subsampling layer with 176 channels is applied. This ensures that the feature dimension after subsampling matches the model’s internal dimension.
-	
-	\item \textbf{Feed-Forward Expansion Factor}
-	
-	Each Conformer block includes a feed-forward network that expands the input dimension by a factor of 4. This expansion allows the model to learn richer representations before projecting back to the original dimension.
-	
-	\item \textbf{Self-Attention Mechanism}
-	
-	The encoder employs self-attention with relative positional encoding. This mechanism captures relative distances between tokens, enhancing the model’s ability to handle long input sequences effectively.
-	
-	\item \textbf{Number of Attention Heads}
-	
-	The multi-head self-attention mechanism uses 4 attention heads. This allows the model to focus on multiple parts of the input sequence simultaneously.
-	
-	\item \textbf{Attention Context Size}
-	
-	The attention mechanism considers the entire sequence, indicated by the unbounded context setting $[-1, -1]$. This enables global context modeling, which is crucial for automatic speech recognition tasks.
-	
-	\item \textbf{Attention Scaling}
-	
-	Dot-product attention scores are scaled by dividing by the square root of the model dimension. This scaling improves numerical stability by preventing excessively large attention values.
-	
-	\item \textbf{Untied Biases}
-	
-	Biases used in relative positional encoding are untied, meaning they are learned separately for each attention head. This provides greater flexibility in learning position-specific representations.
-	
-	\item \textbf{Convolutional Kernel Size}
-	
-	Each Conformer block includes a depthwise convolutional layer with a kernel size of 31. This large kernel size is effective in capturing local temporal dependencies in speech signals.
-	
-	\item \textbf{Overall Dropout Rate}
-	
-	A dropout rate of 0.1 is applied across the model to reduce overfitting and improve generalization during training.
-	
-	\item \textbf{Attention Dropout Rate}
-	
-	The self-attention mechanism uses a dropout rate of 0.1. This regularizes attention weights, enhances generalization, and supports effective modeling of long-range dependencies in speech sequences.
-	
-\end{enumerate}
+A fixed software stack was used to ensure reproducibility of the implementation. All experiments were conducted on Google Colab using an NVIDIA Tesla T4 GPU. Deterministic training was enabled in warn-only mode to account for non-deterministic GPU CTC backward operations while maintaining reproducibility wherever possible. A random seed of 42 was used throughout the experiments. The software and hardware specifications are provided in Table~\ref{tab:fastconformer_env}.
 
 \begin{table}[H]
-	\caption{Encoder Configuration Parameters}
-	\centering
-	\begin{tabular}{|l|l|}
-		\hline
-		\textbf{Parameter} & \textbf{Value} \\
-		\hline
-		Input Feature Dimension ($feat\_in$) & 80 \\
-		Output Feature Dimension ($feat\_out$) & $-1$ (equals $d_{\text{model}}$) \\
-		Number of Layers ($n\_layers$) & 16 \\
-		Model Dimension ($d_{\text{model}}$) & 176 \\
-		Subsampling Method & Striding \\
-		Subsampling Factor & 4 \\
-		Subsampling Convolution Channels & 176 \\
-		Feed-Forward Expansion Factor & 4 \\
-		Self-Attention Model & Relative Positional Encoding \\
-		Number of Attention Heads ($n\_heads$) & 4 \\
-		Maximum Positional Embedding Length & 5000 \\
-		Convolutional Kernel Size & 31 \\
-		Dropout Rate & 0.1 \\
-		\hline
-	\end{tabular}
+\caption{Software and Hardware Configuration}
+\label{tab:fastconformer_env}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Component} & \textbf{Version / Specification} \\
+\hline
+NVIDIA NeMo Toolkit & 2.4.0 \\
+PyTorch Lightning & $\geq$ 2.2.0, $<$ 2.6.0 \\
+Python & 3.12 \\
+CUDA & 12.8 \\
+NumPy & 1.26.4 \\
+GPU Accelerator & NVIDIA Tesla T4 \\
+Random Seed & 42 \\
+\hline
+\end{tabular}
 \end{table}
 
-\subsubsection{Shaswot}
+\textbf{Model Export and Checkpointing}
 
-suprise suprsi
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{/Images/sup.png}
-	\caption{WER on LibriSpeech}
-\end{figure}
+After training, the best model checkpoint was exported in multiple formats to support different deployment scenarios. The complete model was saved in NeMo format with full model weights for direct deployment. In addition, the adapter weights were saved separately in PyTorch format, containing only the trainable adapter parameters for efficient storage and transfer. This dual-export strategy supports both full-model deployment and adapter-only fine-tuning in resource-constrained environments.
 
-\subsubsection{Decoder}
+\subsubsection{Implementation Details for Indic Conformer}
 
-The decoder component in this ASR system is implemented using NVIDIA NeMo's \texttt{ConvASRDecoder} class. It serves as the final classification layer that maps high-level acoustic representations to linguistic tokens. The decoder follows a Connectionist Temporal Classification (CTC) framework, which enables effective sequence-to-sequence alignment without requiring explicit frame-level supervision.
+\textbf{Model Architecture and Configuration}
 
-\textbf{Input and Output Dimensions}
-\begin{itemize}
-	\item The decoder receives 176-dimensional input features, which correspond to the output of the encoder’s final layer. These features represent compact and context-rich acoustic embeddings produced after convolutional and transformer-based processing.
-	\item The number of output classes (\texttt{num\_classes}) is set to 1024. This includes 1023 subword tokens and one additional blank token required by the CTC loss for alignment flexibility during decoding.
-\end{itemize}
+The automatic speech recognition system was built using the IndicConformer \texttt{stt\_ne\_conformer\_ctc\_rnnt\_large} variant. This model uses a hybrid loss function that combines Connectionist Temporal Classification (CTC) and Recurrent Neural Network Transducer (RNNT) objectives, allowing it to benefit from both alignment-free and sequence-to-sequence training paradigms.
 
-\textbf{Vocabulary Design}
-
-The vocabulary consists of 1023 subword units generated using Byte-Pair Encoding (BPE). This design provides a balance between vocabulary compactness and linguistic expressiveness, enabling efficient handling of both frequent and rare words.
-
-\textbf{Token Composition}
-
-The vocabulary includes a combination of special tokens and multiple levels of subword granularity to support robust speech-to-text modeling.
-
-\begin{itemize}
-	\item \textbf{Special Tokens}
-	
-	The \texttt{<unk>} token represents unknown or out-of-vocabulary words and is assigned index 0.  
-	A word-boundary marker represented by \texttt{\textbackslash u2581} is used to denote a preceding whitespace, allowing the model to learn word segmentation explicitly.
-	
-	\item \textbf{Subword Types}
-	
-	Character-level tokens include individual letters from \texttt{a} to \texttt{z}.  
-	Morpheme-level tokens capture common suffixes such as \texttt{-ing}, \texttt{-ed}, \texttt{-tion}, and \texttt{-ment}.  
-	Word-piece tokens represent frequently occurring syllables or partial words.  
-	Whole-word tokens correspond to high-frequency content words that appear often in the training data.
-\end{itemize}
-
-\subsubsection{CTC Implementation}
-\textbf{Architecture Components}
-
-\begin{itemize}
-	\item Single linear projection layer
-	\item LogSoftmax activation for probability normalization
-	\item No hidden layers, which is standard for CTC-based output decoding
-\end{itemize}
-
-\textbf{CTC Loss Integration}
-
-\begin{itemize}
-	\item \textbf{Blank Token}: Implicitly included as the 1024th output class
-	\item \textbf{Alignment}: Supports variable-length sequence alignment using dynamic programming
-	\item \textbf{Gradient Flow}: Enables direct backpropagation through all valid time-aligned paths
-\end{itemize}
-
-\subsubsection{Optimizer Configurations}
-The model  was trained by the AdamW optimizer [Loshchilov \& Hutter, 2017] \cite{ilya} and a cosine annealing learning rate schedule. The hyperparameters of the optimization were chosen very carefully with respect to the empirical observations and the best practices that are applicable in the domain of speech recognition.
-
-\textbf{Optimizer: AdamW}
-
-\begin{itemize}
-	\item \textbf{Learning Rate}: $5 \times 10^{-4}$, reduced from the pre-training learning rate of $1 \times 10^{-3}$. This reduction allows finer parameter updates during fine-tuning, preserving previously learned representations while adapting to the target domain.
-	
-	\item \textbf{Betas}: $[0.9, 0.98]$. These momentum parameters control the exponential decay rates of the first and second moment estimates. The chosen values follow Transformer conventions, with a slightly higher second-moment decay compared to the commonly used value of 0.999, making them better suited for speech data.
-\end{itemize}
-
-The model architecture is relatively compact, which reduces the risk of overfitting due to a smaller parameter count. Additional implicit regularization is achieved through extensive data augmentation using SpecAugment~\cite{park2019specaugment}. The reduced learning rate during fine-tuning further constrains parameter updates, while explicit dropout within the model provides additional regularization.
-
-\textbf{Learning Rate Schedule: Cosine Annealing with Warmup}
-
-\begin{itemize}
-	\item \textbf{Scheduler}: \texttt{NoamAnnealing}. The learning rate increases linearly during the warmup phase and subsequently decays proportionally to the inverse square root of the training step. This scheduling strategy is particularly effective for Transformer-based architectures.
-	
-	\item \textbf{Warmup Steps}: 10{,}000. During the initial warmup phase, the learning rate is gradually increased from near-zero to its peak value, which helps prevent optimization instability in the early stages of training.
-	
-	\item \textbf{Minimum Learning Rate}: $1 \times 10^{-6}$. As training progresses, the learning rate decays toward this lower bound, enabling stable convergence in later stages without disrupting previously learned representations.
-\end{itemize}
+The architecture consists of a Conformer-based encoder, an RNNT decoder, a joint network, and an additional CTC decoder head. The model uses a SentencePiece tokenizer with a vocabulary of 5,632 tokens, derived from 256 tokens per language unit. Unlike the FastConformer-CTC-BPE setup, all model parameters were fully fine-tuned, resulting in approximately 129 million trainable parameters. Table~\ref{tab:indic_model} summarizes the main architectural components and their parameter distribution.
 
 \begin{table}[H]
-	\caption{Optimizer and Learning Rate Scheduler Configuration}
-	\centering
-	\begin{tabular}{|l|l|}
-		\hline
-		\textbf{Parameter} & \textbf{Value} \\
-		\hline
-		Optimizer Name & AdamW \\
-		Learning Rate ($lr$) & 2.0 \\
-		Betas ($\beta_1, \beta_2$) & [0.9, 0.98] \\
-		Weight Decay & 0 \\
-		Scheduler Name & NoamAnnealing \\
-		Model Dimension ($d_{\text{model}}$) & 176 \\
-		Warmup Steps & 10000 \\
-		Warmup Ratio & None \\
-		Minimum Learning Rate ($min\_lr$) & $1 \times 10^{-6}$ \\
-		\hline
-	\end{tabular}
+\caption{Model Components and Parameter Distribution}
+\label{tab:indic_model}
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Component} & \textbf{Module Type} & \textbf{Parameters} & \textbf{Mode} \\
+\hline
+Preprocessor & AudioToMelSpectrogramPreprocessor & 0 & Train \\
+Encoder & ConformerEncoder & 115 M & Train \\
+Decoder & RNNTDecoder & 6.9 M & Train \\
+Joint Network & RNNTJoint & 4.4 M & Train \\
+CTC Decoder & ConvASRDecoder & 2.9 M & Train \\
+Loss Functions & RNNTLoss, CTCLoss & 0 & Train \\
+Total & -- & 129 M & Train \\
+\hline
+\end{tabular}
 \end{table}
 
+\textbf{Dataset and Preprocessing Pipeline}
+
+The experiments were conducted on a Nepali speech dataset split into training and validation subsets. All audio files were standardized to mono-channel format with a sampling rate of 16,000 Hz. Manifest files were normalized to ensure consistency across transcription-related fields such as \texttt{transcription}, \texttt{text}, and \texttt{transcript}, which were mapped to a common format.
+
+No additional audio resampling was applied during fine-tuning, and silence trimming was disabled to preserve natural speech characteristics. Table~\ref{tab:indic_dataset} presents the dataset statistics, including sample counts and duration.
+
+\begin{table}[H]
+\caption{Dataset Duration Statistics}
+\label{tab:indic_dataset}
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Split} & \textbf{Sample Count} & \textbf{Duration (Hours)} & \textbf{Average Duration (Seconds)} \\
+\hline
+Training & 15,820 & 15.59 & 3.55 \\
+Validation & 3,955 & 3.82 & 3.48 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Training Hyperparameters and Optimization}
+
+The model was fine-tuned using PyTorch Lightning together with the AI4Bharat NeMo fork. AdamW with decoupled weight decay was used as the optimizer. The learning rate schedule followed a WarmupAnnealing strategy with 500 warmup steps followed by annealing. Training was conducted for up to 15 epochs with a batch size of 16 samples per step.
+
+Gradient clipping with a value of 1.0 was applied to stabilize optimization. Early stopping with a patience of 3 epochs was used based on validation WER to reduce overfitting. The full training configuration is given in Table~\ref{tab:indic_train}.
+
+\begin{table}[H]
+\caption{Training Hyperparameters}
+\label{tab:indic_train}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Hyperparameter} & \textbf{Value} \\
+\hline
+Maximum Epochs & 15 \\
+Training Batch Size & 16 \\
+Evaluation Batch Size & 32 \\
+Gradient Accumulation & 1 \\
+Learning Rate & $5.0\times10^{-5}$ \\
+Weight Decay & $1.0\times10^{-3}$ \\
+Warmup Steps & 500 \\
+Gradient Clipping & 1.0 \\
+Early Stopping Patience & 3 \\
+Early Stopping Min Delta & 0.001 \\
+Checkpoint Save Top K & 2 \\
+Validation Frequency & Every 2 Epochs \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Regularization and Augmentation}
+
+SpecAugment was used during training to improve robustness against noise and acoustic variability. The implementation used a Numba CUDA kernel for efficient spectrogram masking. The augmentation strategy included both frequency masking and time masking of the input spectrograms.
+
+Mixed-precision training with 16-bit Automatic Mixed Precision (AMP) was also enabled to reduce memory consumption and speed up computation. Table~\ref{tab:indic_runtime} shows the runtime and optimization settings.
+
+\begin{table}[H]
+\caption{Runtime and Optimization Settings}
+\label{tab:indic_runtime}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Configuration} & \textbf{Setting} \\
+\hline
+Spectrogram Augmentation & Enabled \\
+Augmentation Kernel & Numba CUDA \\
+Precision & 16-bit Mixed (AMP) \\
+Matrix Multiplication Precision & Medium \\
+Deterministic Mode & Disabled \\
+CuDNN Benchmark & Enabled \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Hardware and Software Environment}
+
+All experiments were carried out in Google Colab with high-performance GPU acceleration. The software stack included the AI4Bharat fork of NVIDIA NeMo, patched for compatibility with NumPy 2.x runtimes. Particular attention was given to version compatibility for PyTorch and PyTorch Lightning to ensure reproducibility. The system specifications are shown in Table~\ref{tab:indic_env}.
+
+\begin{table}[H]
+\caption{System and Software Specifications}
+\label{tab:indic_env}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Component} & \textbf{Specification} \\
+\hline
+GPU & NVIDIA A100-SXM4-80GB \\
+CUDA Version & 12.8 \\
+PyTorch Version & 2.10.0+cu128 \\
+PyTorch Lightning & 2.6.1 \\
+NeMo Version & 1.23.0rc0 \\
+Python Version & 3.12 \\
+NumPy Version & 2.0.2 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Evaluation Metrics and Checkpointing}
+
+Validation Word Error Rate (WER) and Character Error Rate (CER) were used as the primary performance metrics and were computed every second epoch. The training loop also tracked the individual CTC and RNNT loss components to monitor convergence of both objectives.
+
+Model checkpoints were selected based on the lowest validation WER, and the top two checkpoints were retained for final evaluation. The monitored metrics included training loss, validation loss, and the corresponding CTC and RNNT loss components. The evaluation and checkpointing setup is summarized in Table~\ref{tab:indic_eval}.
+
+\begin{table}[H]
+\caption{Training and Evaluation Metrics}
+\label{tab:indic_eval}
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Metric} & \textbf{Description} & \textbf{Monitoring Frequency} \\
+\hline
+Validation WER & Primary Optimization Metric & Every 2 Epochs \\
+Validation CER & Secondary Accuracy Metric & Every 2 Epochs \\
+Training Loss & Combined CTC and RNNT Loss & Per Step \\
+Validation Loss & Combined CTC and RNNT Loss & Every 2 Epochs \\
+Checkpoint Monitor & val\_wer\_eval & Every 2 Epochs \\
+Checkpoint Mode & Minimization & Every 2 Epochs \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Model Exporting and Quantization for Indic Conformer}
+
+The fine-tuned IndicConformer Hybrid CTC/RNNT Large model, containing 129 million parameters, was converted to the Open Neural Network Exchange (ONNX) format using a conversion pipeline based on the NVIDIA NeMo framework. After export, post-training quantization was applied to reduce storage requirements and improve deployment efficiency. The export configuration and quantization strategy are described below.
+
+\textbf{Model Export Configuration (NeMo to ONNX)}
+
+The AI4Bharat fork of NVIDIA NeMo (branch \texttt{nemo-v2}) was used to export the model. Because of the architectural complexity of the Conformer encoder, especially the \texttt{rel\_shift} attention mechanism, the legacy TorchScript-based ONNX exporter was used instead of the newer PyTorch Dynamo exporter in order to avoid symbolic shape-related errors. During export, the decoder head was isolated to ensure compatibility with standard inference engines.
+
+\begin{table}[H]
+\caption{Model Export Configuration}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Configuration Parameter} & \textbf{Setting / Value} \\
+\hline
+Source Framework & NVIDIA NeMo (AI4Bharat nemo-v2) \\
+Model Architecture & EncDecHybridRNNTCTCBPEModel \\
+Export Format & ONNX (Opset $\geq$ 10) \\
+Exporter Backend & Legacy TorchScript (dynamo=False) \\
+Decoder Strategy & CTC (\texttt{decoder\_type: "ctc"}) \\
+Input Tensor & \texttt{audio\_signal} (float32), \texttt{length} (int64) \\
+Output Tensor & \texttt{logprobs} (float32) \\
+Export Device & CUDA (GPU) \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Quantization Strategy}
+
+To make the model suitable for deployment in resource-constrained environments, dynamic post-training quantization was applied to the exported FP32 ONNX model. This method converts model weights from floating point to integer representation without requiring a calibration dataset. As a result, the deployment pipeline remains simple while still providing substantial storage savings with acceptable accuracy retention.
+
+\begin{table}[H]
+\caption{Quantization Configuration}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Quantization Parameter} & \textbf{Setting / Value} \\
+\hline
+Quantization Library & onnxruntime.quantization \\
+Method & Dynamic Quantization (\texttt{quantize\_dynamic}) \\
+Weight Precision & INT8 (QuantType.QInt8) \\
+Activation Precision & FP32 (Dynamic) \\
+Calibration Data & Not Required \\
+Unsupported Operators & Skipped (e.g., specific Slice operations) \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Storage Optimization Results}
+
+The quantization pipeline resulted in a significant reduction in model storage size. Table~\ref{tab:quant_result} compares the original exported model with the quantized version.
+
+\begin{table}[H]
+\caption{Model Size Comparison Before and After Quantization}
+\label{tab:quant_result}
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Model Stage} & \textbf{Precision} & \textbf{File Size (MB)} & \textbf{Size Reduction (\%)} \\
+\hline
+Exported ONNX & FP32 & 470.22 & --- \\
+Quantized ONNX & INT8 (Weights) & 133.94 & 71.51\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The quantized implementation reduced the model footprint by approximately 71.5\%, making it more suitable for deployment on edge devices and in environments with limited storage capacity. At the same time, the original inference logic of the architecture was preserved through ONNX Runtime execution.
 
 \subsection{SLM}
 \subsubsection{Dataset}
@@ -442,7 +445,13 @@ Self attention mechanism does not have a notion of position or order of tokens w
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{Images/SLM/Implementation Details/Embedding.pdf}
+    \IfFileExists{Images/SLM/Implementation Details/Embedding.pdf}{%
+        \includegraphics[width=\linewidth]{Images/SLM/Implementation Details/Embedding.pdf}%
+    }{%
+        \fbox{\parbox{0.92\linewidth}{\centering
+        Embedding illustration file not available in the repository.\\
+        This figure is intended to show token embeddings combined with positional embeddings before being passed into the decoder.}}%
+    }
     \caption{Token and Positional Embedding}
 \end{figure}
 
@@ -451,7 +460,13 @@ The Multi-Head Attention module uses a casual scaled dot product attention mecha
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Images/SLM/Implementation Details/AttentionMechanism.pdf}
+    \IfFileExists{Images/SLM/Implementation Details/AttentionMechanism.pdf}{%
+        \includegraphics[width=1\linewidth]{Images/SLM/Implementation Details/AttentionMechanism.pdf}%
+    }{%
+        \fbox{\parbox{0.92\linewidth}{\centering
+        Attention mechanism illustration file not available in the repository.\\
+        This figure is intended to summarize causal masked multi-head attention with query, key, and value projections.}}%
+    }
     \caption{Attention Mechanism}
     \label{fig:Attention Mechanism}
 \end{figure}
