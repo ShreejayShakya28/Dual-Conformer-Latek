@@ -3,6 +3,7 @@
 % 
 \ProvidesClass{ioereport}[Project Report Template]
 \LoadClass[a4paper, 12pt]{article}
+\pdfminorversion=7
 \RequirePackage[margin=1in, left=1.5in, bottom=1.15in]{geometry}
 \RequirePackage{mathptmx} % times font
 \RequirePackage{setspace} % for one half spacing
@@ -13,7 +14,7 @@
 \RequirePackage{float} % for floating figure/tables placements
 \RequirePackage{caption} % for caption formatting
 \RequirePackage{hyphenat}
-\RequirePackage{hyperref} 
+\RequirePackage[hypertexnames=false]{hyperref}
 \RequirePackage{amssymb, amsmath, newtxmath}
 \RequirePackage{pgffor} % for foreach
 \RequirePackage{xstring} % for IfEq
@@ -25,6 +26,11 @@
 \usepackage{url}         % Enables line-breaking in URLs
 \usepackage{tabularx}    % For flexible-width tables
 \usepackage{booktabs}    % For professional table formatting
+\setlength{\emergencystretch}{2em}
+\hbadness=10000
+\vbadness=10000
+\hfuzz=60pt
+\vfuzz=60pt
 % Command for Title Preamble
 \newcommand{\titlepreamble}[1]{%
     \def\thetitlepreamble{#1}%

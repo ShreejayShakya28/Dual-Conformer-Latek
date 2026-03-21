@@ -96,7 +96,7 @@ The specific configurations for the two models are as follows:
 \caption{ConvSubsampling layer dimensions}
 \label{tab:convsubsampling_dimensions}
 \centering
-\begin{tabular}{|l|l|l|}
+\begin{tabularx}{\textwidth}{|l|X|X|}
 \hline
 \textbf{Parameter} & \textbf{Fast Conformer} & \textbf{Indic Conformer} \\
 \hline
@@ -106,7 +106,7 @@ Conv layer 2 & Conv2d(176, 176, 3$\times$3, stride 2) & Conv2d(512, 512, 3$\time
 Activation 2 & ReLU & ReLU \\
 Temporal reduction & 4$\times$ (10 ms $\to$ 40 ms) & 4$\times$ (10 ms $\to$ 40 ms) \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
 
 \subsubsection{Linear}
