@@ -18,9 +18,6 @@ The system pipeline starts with the spoken audio of the user that is either in E
     \caption{Architecture of ASR}
 \end{figure}
 The ASR subsystem uses two different Conformer-based models to process english and nepali speech input. The FastConformer architecture based on EncDecCTCModelBPE is used to process English speech and the IndicConformer architecture based on EncDecHybridRNNTCTCBPEModel is used to process Nepali speech. Both models are also trained on NeMo benchmarks and have the same overall design, a convolutional front-end, a series of Conformer encoder layers, and a CTC decoding head, but have different model dimensionality, vocabulary size, and encoder layers, since they are trained on different scale data and linguistic complexity data.
-\usepackage{tabularx}
-\usepackage{booktabs}
-\newcolumntype{X}{>{\raggedright\arraybackslash}X}
 
 \begin{table}[H]
 \caption{Model Configuration Comparison: FastConformer (English) vs IndicConformer (Nepali)}
@@ -31,7 +28,7 @@ The ASR subsystem uses two different Conformer-based models to process english a
 \hline
 \textbf{Parameter} & \textbf{FastConformer (English)} & \textbf{IndicConformer (Nepali)} \\
 \hline
-Model class & \texttt{EncDecCTCModelBPE} & \texttt{EncDecHybrid} \lineskip \texttt{RNNTCTCBPEModel} \\
+Model class & \texttt{EncDecCTCModelBPE} & \shortstack[l]{\texttt{EncDecHybrid}\\\texttt{RNNTCTCBPEModel}} \\
 Language & English & Nepali (Indic) \\
 Encoder hidden dim & 176 & 512 \\
 Encoder layers & 16 & 17 \\
