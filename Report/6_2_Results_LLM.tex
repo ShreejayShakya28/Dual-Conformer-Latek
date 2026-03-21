@@ -1,0 +1,122 @@
+\subsection{SLM}
+\subsubsection{Inference}
+\textbf{Before Training}
+\begin{itemize}
+    \item \textbf{Input text:} What type of cloud is typically associated with thunderstorms?
+    \item \textbf{Output:} What type of cloud is typically associated with thunderstorms? imaginaryonetolution Mortgage TT remember gard ACTIONSussedOND repeEdge Storage severerelease
+\end{itemize}
+
+\textbf{After loading weights}
+\begin{itemize}
+    \item \textbf{Input text:} What type of cloud is typically associated with thunderstorms?
+    \item \textbf{Output:} What type of cloud is typically associated with thunderstorms? Why did lightning get it going down in Oklahoma?" What sort of cloud was seen on September 19 that led to reports
+\end{itemize}
+
+\textbf{After instruction finetuning}
+\begin{verbatim}
+Below is an instruction that describes a task. Write a response that 
+appropriately completes the request.
+Rewrite the sentence using a simile.
+### Input:
+The car is very fast.
+Correct response:
+>> The car is as fast as lightning.
+Model response:
+>> The car is as fast as a bullet.
+-------------------------------------
+Below is an instruction that describes a task. Write a response 
+that appropriately completes the request.
+### Instruction:
+What type of cloud is typically associated with thunderstorms?
+Correct response:
+Model response:
+>> The type of cloud associated with thunderstorms is a cumulus cloud.
+-------------------------------------
+Below is an instruction that describes a task. Write a response 
+that appropriately completes the request.
+### Instruction:
+Name the author of 'Pride and Prejudice'.
+Correct response:
+>> Jane Austen.
+Model response:
+>> The author of 'Pride and Prejudice' is Jane Austen.
+\end{verbatim}
+
+\subsubsection{Evaluation Metrics}
+\textbf{BLEU Score Analysis}\\
+BLEU is a common metric to evaluate machine‐generated text with one or more
+reference texts. A single BLEU score calculates precision where zero being the worst and
+one being perfect. Typically for NLP tasks, a BLEU4 score of at least 0.4 is
+considered good, while a score of 0.6 and higher is exceptional. The comparative analysis of the performance regarding our model shows a relatively low score of 0.3061 for BLEU-4 and 0.45 for BLEU-1 score.
+
+The BLEU-1 score checks for only single word overlaps while the BLEU-2 and higher grams look for matches of 2,3 and 4 word sequences respectively. These are obviously harder to match as generated text doesn't use the same phrasing as the reference texts. This is the reason we see a drop from .45 to .3061 from BLEU-1 to BLEU-4. The descending slope in the graph confirms that matching long sequences is tougher. %Shorter outputs reduce the
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Images/SLM/Results/blue.png}
+    \caption{BLEU Score}
+\end{figure}
+
+\textbf{ROUGE Score Analysis}\\
+ROUGE score is another evaluation metric used for NLP and text-generation related tasks. There are various ROGUE metrics like ROUGE-N, ROUGE-L etc. ROUGE-L evaluates the similarity between generated and reference text based on the length of their Longest Common Subsequence (LCS).
+
+\begin{itemize}
+    \item \textbf{Precision (0.5965)}
+        \begin{itemize}
+            \item About 59.65\% of the words that are generated appeared also within the reference in correct order.
+            \item High precision indicates the text has correct information but could miss some parts of the reference.
+        \end{itemize}    
+    \item \textbf{Recall (0.6256)}
+        \begin{itemize}
+            \item About 62.56\% of the reference text is covered by the generated text
+            \item Higher recall indicates the generated text covers most of the reference text
+        \end{itemize}   
+    \item \textbf{F1 (0.5862)}
+        \begin{itemize}
+            \item The F1 score balances the precision and recall
+            \item Here the 58.62\% means that the generated text is moderately good in terms of the coverage and correctness when it is compared with reference text
+        \end{itemize}
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Images/SLM/Results/rouge.png}
+    \caption{BLEU Score}
+\end{figure}
+
+\textbf{Evaluation Metrics Table}
+
+\begin{table}[H]
+    \centering
+    \caption{Evaluation Metrics}
+    \begin{tabular}{|l|l|}
+        \hline
+        Metric & Value\\
+        \hline
+        Masked Loss & 0.6722 \\
+        Perplexity & 1.96\\
+        BERTScore F1 & 0.9303\\
+        ROUGE-L & 0.5862\\
+        \hline
+    \end{tabular}
+\end{table}
+
+\subsubsection{BLEU vs ROUGE Score}
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Images/SLM/Results/blueVsRouge.png}
+	\caption{BLEU vs ROUGE scores for different n-grams}
+\end{figure}
+
+The scatter plot compares BLEU and ROUGE-F1 scores across three metrics:
+BLEU-1 vs. ROUGE-1 (red), BLEU-2 vs. ROUGE-2 (blue), and BLEU-4 vs. ROUGE-L (green). Overall, there is a positive correlation, higher BLEU scores means higher ROUGE scores.
+
+\textbf{Upward Sloping trend}
+
+Each cluster shows an upward trend, which shows the model performing well in BLEU(n-gram precision) also tends to perform well in ROUGE. Points near the diagonal typically show a system where both metrics are balanced. Points above the diagonal indicate a higher ROUGE Score than a BLEU score meaning the model prioritizes concise but incomplete outputs. Similarly, points below the diagonal indicate a higher BLEU score than ROUGE SCORE indicating the model focuses more on recall rather than precision.
+
+\textbf{Differences Among the Clusters}
+
+The orange cluster (BLEU-1 vs. ROUGE-1) is tightly aligned, as both focus on unigram overlap. The blue cluster (BLEU-2 vs. ROUGE-2) shows more variation, reflecting sensitivity to bigram accuracy. The green cluster (BLEU-4 vs. ROUGE-L) is the most dispersed because BLEU-4 requires strict 4-gram matches, whereas ROUGE-L checks the longest
+common subsequence which might not align perfectly with exact four-gram overlap.
