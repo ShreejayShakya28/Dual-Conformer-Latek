@@ -18,15 +18,20 @@ The system pipeline starts with the spoken audio of the user that is either in E
     \caption{Architecture of ASR}
 \end{figure}
 The ASR subsystem uses two different Conformer-based models to process english and nepali speech input. The FastConformer architecture based on EncDecCTCModelBPE is used to process English speech and the IndicConformer architecture based on EncDecHybridRNNTCTCBPEModel is used to process Nepali speech. Both models are also trained on NeMo benchmarks and have the same overall design, a convolutional front-end, a series of Conformer encoder layers, and a CTC decoding head, but have different model dimensionality, vocabulary size, and encoder layers, since they are trained on different scale data and linguistic complexity data.
+\usepackage{tabularx}
+\usepackage{booktabs}
+\newcolumntype{X}{>{\raggedright\arraybackslash}X}
+
 \begin{table}[H]
 \caption{Model Configuration Comparison: FastConformer (English) vs IndicConformer (Nepali)}
 \label{tab:conformer_comparison}
 \centering
-\begin{tabular}{|l|l|l|}
+\small
+\begin{tabularx}{\textwidth}{|l|X|X|}
 \hline
 \textbf{Parameter} & \textbf{FastConformer (English)} & \textbf{IndicConformer (Nepali)} \\
 \hline
-Model class & EncDecCTCModelBPE & EncDecHybridRNNTCTCBPEModel \\
+Model class & \texttt{EncDecCTCModelBPE} & \texttt{EncDecHybrid} \lineskip \texttt{RNNTCTCBPEModel} \\
 Language & English & Nepali (Indic) \\
 Encoder hidden dim & 176 & 512 \\
 Encoder layers & 16 & 17 \\
@@ -34,11 +39,12 @@ FFN expansion ratio & $4\times$ (176 $\to$ 704) & $4\times$ (512 $\to$ 2048) \\
 Conv kernel size (depthwise) & 31 & 31 \\
 Attention dim & 176 & 512 \\
 Vocabulary size & 1025 (BPE) & 5633 (BPE) \\
-CTC projection & Conv1d(176, 1025) & Conv1d(512, 5633) \\
+CTC projection & \texttt{Conv1d(176, 1025)} & \texttt{Conv1d(512, 5633)} \\
 Decoding path used & CTC & CTC only \\
 \hline
-\end{tabular}
+\end{tabularx}
 \end{table}
+
 \subsubsection{Feature Extraction}
 Both models have the same front end preprocessing pipeline that is an AudioToMelSpectrogramPreprocessor using a FilterbankFeatures featurizer. The raw audio waveforms are converted into mel-frequency filterbank features and these features are then sent to the encoder. Both models use the same technique of the preprocessing pipeline since both are trained on 16 kHz speech data.
 
