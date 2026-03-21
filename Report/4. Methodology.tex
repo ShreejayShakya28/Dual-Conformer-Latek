@@ -4,14 +4,11 @@
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-SuperMainArchitecture.drawio.pdf}
-    \caption{Proposed System Architecture}
+    \caption{System Architecture}
 \end{figure}
 
-The system pipeline starts with spoken audio input from the user, which is expected to be in English. The audio signal is first processed by the Automatic Speech Recognition (ASR) module, where acoustic feature extraction is performed using Mel spectrograms. These features are then passed to a Conformer-based neural network, which converts the speech signal into a textual transcription.
+The system pipeline starts with the spoken audio of the user that is either in English or Nepali. The Interface module handles the preprocessing of the audio signal after which it is sent to the relevant Automatic Speech Recognition (ASR) pathway depending on which language is being used.In the case of Nepali audio input, the signal is run through the Quantized Indic Conformer model that caters to Indic language meaning that the speech is converted into textual transcription. This transcription is further sent to a Translation module so that it can be translated to English before being sent to the Small Language Model (SLM).With English audio input, the signal is handled in a quicker pathway by the Fast Conformer model that directly transcribes the speech into text. This is an English transcription that is directly forwarded to the SLM without need of translation.The SLM also acts on a Retrieval-Augmented Generation (RAG) basis. It has a Knowledge Base which has the news articles and information of the last two years. When a transcribed text is received by the SLM, the Retriever component is used in a search of this Knowledge Base to retrieve information that is relevant and up-to-date concerning the query made by the user. This memory context is then subjected to the language interpretation abilities of the SLM to create correct responses of context-aware nature based on the latest news and events. The output of the SLM, which is refined on a specialized dataset and optimized to perform local inference, is the combination of the query input and the knowledge retrieved to produce a coherent reply in English.At the end, two output paths are available to the English text response: one of them is to send the English text response straight to the English TTS module and to receive the audio in English and another is to translate the SLM output to nepali and send it to the Nepali TTS module and to get the audio in Nepali. This two-way mechanism offers the system the ability to support bilingual input and offer versatile multilingual output as per the needs of the user.
 
-Once transcription is completed, the resulting text is forwarded to a Small Language Model (SLM). The SLM is fine-tuned on a custom dataset and optimized for local inference and response generation. It analyzes the transcription to infer the underlying intent, context, and semantics, and generates a coherent textual response.
-
-Finally, the generated text response is converted into speech using a Text-to-Speech (TTS) module based on the user's prompt configuration. The text response is also provided directly as an output. 
 
 \subsection{Automatic Speech Recognition}
 \subsubsection{Architecture of ASR}
