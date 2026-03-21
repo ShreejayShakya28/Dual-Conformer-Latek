@@ -71,7 +71,7 @@ Training was performed using PyTorch Lightning together with the NeMo toolkit. O
 \textbf{Parameter} & \textbf{Value} \\
 \hline
 Maximum Epochs & 12 \\
-Batch Size & 8 \\
+Batch Size & 32 \\
 Gradient Accumulation Steps & 2 \\
 Learning Rate & $1\times10^{-4}$ \\
 Minimum Learning Rate & $1\times10^{-6}$ \\
@@ -79,7 +79,7 @@ Weight Decay & $5\times10^{-2}$ \\
 Adam Betas & (0.9, 0.98) \\
 Warmup Ratio & 0.1 \\
 Gradient Clipping & 1.0 \\
-Precision & 16-bit Mixed (AMP) \\
+Precision & bf-16 mixed\\
 Learning Rate Scheduler & Cosine Annealing \\
 \hline
 \end{tabular}
@@ -178,14 +178,14 @@ Decoder & RNNTDecoder & 6.9 M & Train \\
 Joint Network & RNNTJoint & 4.4 M & Train \\
 CTC Decoder & ConvASRDecoder & 2.9 M & Train \\
 Loss Functions & RNNTLoss, CTCLoss & 0 & Train \\
-Total & -- & 129 M & Train \\
+\textbf{Total} & -- & 129 M & Train \\
 \hline
 \end{tabular}
 \end{table}
 
 \textbf{Dataset and Preprocessing Pipeline}
 
-The experiments were conducted on a Nepali speech dataset split into training and validation subsets. All audio files were standardized to mono-channel format with a sampling rate of 16,000 Hz. Manifest files were normalized to ensure consistency across transcription-related fields such as \texttt{transcription}, \texttt{text}, and \texttt{transcript}, which were mapped to a common format.
+The experiments were conducted on a Nepali speech dataset split into training and validation subsets. All audio files were standardized to mono-channel format with a sampling rate of 16,000 Hz. Manifest files were normalized to ensure consistency across transcription-related fields such as \texttt{text}, and \texttt{transcript}, which were mapped to a common format.
 
 No additional audio resampling was applied during fine-tuning, and silence trimming was disabled to preserve natural speech characteristics. Table~\ref{tab:indic_dataset} presents the dataset statistics, including sample counts and duration.
 
@@ -217,18 +217,18 @@ Gradient clipping with a value of 1.0 was applied to stabilize optimization. Ear
 \hline
 \textbf{Hyperparameter} & \textbf{Value} \\
 \hline
-Maximum Epochs & 15 \\
-Training Batch Size & 16 \\
-Evaluation Batch Size & 32 \\
+Maximum Epochs & 12 \\
+Training Batch Size & 32 \\
+Evaluation Batch Size & 64 \\
 Gradient Accumulation & 1 \\
-Learning Rate & $5.0\times10^{-5}$ \\
-Weight Decay & $1.0\times10^{-3}$ \\
+Learning Rate & $1\times10^{-6}$ \\
+Weight Decay & $5.0\times10^{-2}$ \\
 Warmup Steps & 500 \\
 Gradient Clipping & 1.0 \\
-Early Stopping Patience & 3 \\
+Early Stopping Patience & 5 \\
 Early Stopping Min Delta & 0.001 \\
-Checkpoint Save Top K & 2 \\
-Validation Frequency & Every 2 Epochs \\
+Checkpoint Save Top K & 1 \\
+Validation Frequency & Every 3 Epochs \\
 \hline
 \end{tabular}
 \end{table}
@@ -237,7 +237,7 @@ Validation Frequency & Every 2 Epochs \\
 
 SpecAugment was used during training to improve robustness against noise and acoustic variability. The implementation used a Numba CUDA kernel for efficient spectrogram masking. The augmentation strategy included both frequency masking and time masking of the input spectrograms.
 
-Mixed-precision training with 16-bit Automatic Mixed Precision (AMP) was also enabled to reduce memory consumption and speed up computation. Table~\ref{tab:indic_runtime} shows the runtime and optimization settings.
+Brain floating point 16bit (bf16-mixed) was also enabled to reduce memory consumption and speed up computation. Table~\ref{tab:indic_runtime} shows the runtime and optimization settings.
 
 \begin{table}[H]
 \caption{Runtime and Optimization Settings}
@@ -249,7 +249,7 @@ Mixed-precision training with 16-bit Automatic Mixed Precision (AMP) was also en
 \hline
 Spectrogram Augmentation & Enabled \\
 Augmentation Kernel & Numba CUDA \\
-Precision & 16-bit Mixed (AMP) \\
+Precision & bf16-mixed\\
 Matrix Multiplication Precision & Medium \\
 Deterministic Mode & Disabled \\
 CuDNN Benchmark & Enabled \\
@@ -294,11 +294,11 @@ Model checkpoints were selected based on the lowest validation WER, and the top 
 \hline
 \textbf{Metric} & \textbf{Description} & \textbf{Monitoring Frequency} \\
 \hline
-Validation WER & Primary Optimization Metric & Every 2 Epochs \\
-Validation CER & Secondary Accuracy Metric & Every 2 Epochs \\
+Validation WER & Primary Optimization Metric & Every 3 Epochs \\
+Validation CER & Secondary Accuracy Metric & Every 3 Epochs \\
 Training Loss & Combined CTC and RNNT Loss & Per Step \\
 Validation Loss & Combined CTC and RNNT Loss & Every 2 Epochs \\
-Checkpoint Monitor & val\_wer\_eval & Every 2 Epochs \\
+Checkpoint Monitor & val\_wer\_eval & Every 1 Epochs \\
 Checkpoint Mode & Minimization & Every 2 Epochs \\
 \hline
 \end{tabular}
@@ -364,8 +364,9 @@ The quantization pipeline resulted in a significant reduction in model storage s
 \hline
 \textbf{Model Stage} & \textbf{Precision} & \textbf{File Size (MB)} & \textbf{Size Reduction (\%)} \\
 \hline
-Exported ONNX & FP32 & 470.22 & --- \\
-Quantized ONNX & INT8 (Weights) & 133.94 & 71.51\% \\
+Indic Conformer & FP32 & 493.05 & --- \\
+Exported ONNX & FP32 & 470.22 & 4.6\% \\
+Quantized ONNX & INT8 & 133.94 & 71.51\% \\
 \hline
 \end{tabular}
 \end{table}
