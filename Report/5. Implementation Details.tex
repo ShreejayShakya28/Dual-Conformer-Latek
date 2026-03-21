@@ -495,8 +495,6 @@ The Multi-Head Attention module uses a casual scaled dot product attention mecha
     
 \end{itemize}
 
-
-
 \subsubsection{Model Creation}
 \textbf{Layer Normalization and GELU activation}\\
 For layer normalization which normalizes activations across the embedding dimension for each token independently to compute the mean and variance along the last dimension.
@@ -533,3 +531,147 @@ This feed network uses the Gaussian Error Linear Unit (GELU) activation. It intr
 
 \textbf{Transformer block and model}\\
 The first input goes through layer normalization. The feed forward part consists of two linear layers. The first expands the embedding dimension to 4 times its size, applies GELU and projects the original embedding dimension towards the second linear layer. Which is followed by multi-head attention sub-layer. A dropout is applied to the attention output and a residual connection adds a shortcut. This process is repeated multiple times to form a core transformer stack. The model begins with a token embedding layer and positional embedding of the same dimensions. Which then flows to the stack of n\_layers of the transformer block. A last layer normalization is applied and linear output head is used that projects the embeddings to a vocabulary size. The result logits represents unnormalized probabilities over next token for each position in the sequence.
+
+\subsection{RAG}
+\subsubsection{Architecture}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Images/RAG/Methodology/ASR-RAG.drawio.pdf}
+    \caption{Architecture Of RAG}
+\end{figure}
+
+\subsubsection{Scraping}
+
+The data collection layer maintains the knowledge base with the latest news articles from Nepali-based English news outlets. The pipeline uses RSS feeds as opposed to scraping raw HTML, which is inconsistent and frequently changed. It does not perform any HTML parsing except where no RSS feed is available.
+
+\textbf{RSS Feeds}
+
+RSS feeds are XML files published by news sites for automated consumption. Feed items consist of an article URL, title, time of publication, and an optional short description. Since all sites share the same format, a large number of sources can be processed by a single parser. \texttt{feedparser} is used to download and process all feeds in the pipeline. The scraper, on a per-entry basis, extracts the URL and date, verifies the entry has not already been processed, and queues it for full-text extraction. Eighteen feeds are registered across major English-language Nepali news sources including \textit{Kathmandu Post}, \textit{Online Khabar}, \textit{Spotlight Nepal}, \textit{My Republica}, \textit{The Himalayan Times}, and \textit{Nepal News}.
+
+\textbf{Article Extraction}
+
+For every URL, \texttt{newspaper4k} downloads the page and applies heuristics to locate the main article text. It strips away navigation menus, sidebars, advertisements, and footer material, delivering clean prose. This approach works effectively across most sites and requires no site-specific configuration.
+
+Some websites block \texttt{newspaper4k}'s default requests. In such cases the pipeline falls back to a manual process. It issues an HTTP GET request with a browser-like \texttt{User-Agent} via the \texttt{requests} library and parses the HTML using \texttt{BeautifulSoup4}. Paragraph tags within the main content area are extracted, their text is merged, and the article body is reconstructed. This fallback is applied only to sites known to block automated scrapers.
+
+\textbf{Quality Filtering and Deduplication}
+
+Two checks are performed before any article enters the pipeline. First, the URL is checked against an SQLite database; if already present, the article is skipped entirely, preventing duplication across repeated runs. Second, articles containing fewer than 80 words of extracted text are discarded, as short extractions typically indicate a failed parse, a paywall stub, or an advertisement fragment. A delay of 1.0 second is enforced between requests to maintain low server load.
+
+\begin{table}[H]
+\caption{Scraping Configuration}
+\label{tab:scraping_config}
+\centering
+\begin{tabularx}{\linewidth}{|l|l|X|}
+\hline
+\textbf{Parameter} & \textbf{Value} & \textbf{Purpose} \\
+\hline
+Number of RSS feeds & 18 & Coverage across major English outlets \\
+Max articles per feed & 100 & Upper ceiling per refresh cycle \\
+Minimum word count & 80 & Filters failed extractions \\
+Request delay & 1.0 s & Polite crawling \\
+Request timeout & 15 s & Handles slow archival pages \\
+Primary extractor & \texttt{newspaper4k} & Clean article body extraction \\
+Fallback extractor & \texttt{requests} + \texttt{BeautifulSoup4} & Blocked-site handling \\
+\hline
+\end{tabularx}
+\end{table}
+
+\subsubsection{Indexing}
+
+Indexing converts unstructured articles into a structured, searchable format allowing the system to locate appropriate content quickly. In the absence of indexing, query processing would search every document, which is not realistic when dealing with large collections. The system uses dense vector indexing, where documents and queries are represented in the same continuous space such that similar documents are geometrically close. This approach is stronger compared to previous inverted-index approaches such as BM25, which rely on word overlap and fail when the wording changes.
+
+\textbf{FAISS IndexFlatIP}
+
+The index is built on FAISS IndexFlatIP, where Flat denotes exhaustive exact search and IP denotes inner product as the similarity metric. Given a query vector $\mathbf{q} \in \mathbb{R}^{384}$ and $N$ stored chunk vectors, the index computes:
+
+\begin{equation}
+    s(\mathbf{q}, \mathbf{d}_i) = \mathbf{q} \cdot \mathbf{d}_i
+\end{equation}
+
+All vectors are L2-normalised prior to storage ($\|\mathbf{q}\| = \|\mathbf{d}_i\| = 1$), so the inner product of two vectors equals their cosine similarity, scoring 1.0 for identical semantic direction. IndexFlatIP was chosen over approximate alternatives such as IndexIVFFlat and IndexHNSWFlat because at this scale, exact search completes in milliseconds on CPU. Parameters for IndexIVFFlat are retained in configuration for when the dataset scales to millions of chunks.
+
+\textbf{Chunking}
+
+The embedding model all-MiniLM-L6-v2 has a maximum sequence length of 256 word-pieces, while most articles run to 800--1500 words. Encoding an entire article as a single vector produces an averaged representation of all its content, meaning a query targeting a specific passage would not match well. Articles are instead divided into overlapping segments along sentence boundaries. Sentences are first extracted using NLTK's Punkt tokeniser, then greedily accumulated into a buffer until the estimated token count reaches 500 tokens, approximated as:
+
+\begin{equation}
+    \hat{t} = \frac{w}{0.75}
+\end{equation}
+
+where $w$ is word count and the divisor accounts for the average English subword tokenisation ratio of approximately 1.33 tokens per word. When the buffer fills, it is finalised as a chunk and a new buffer is seeded with the last 50 tokens of sentences from the previous chunk. This overlap ensures that any passage crossing a chunk boundary is fully represented in at least one chunk, preventing retrieval failure on boundary-spanning content. Each chunk inherits the parent article's metadata --- title, URL, publication date, and source --- for downstream citation.
+
+\textbf{Embedding and Storing}
+
+Each chunk is encoded by passing it through all-MiniLM-L6-v2, which applies six transformer layers of multi-head self-attention and mean-pools the final hidden states across all token positions constraining it to the unit hypersphere and enabling cosine similarity via inner product as required by FAISS IndexFlatIP. 
+
+\begin{equation}
+    \mathbf{e} = \frac{1}{T} \sum_{t=1}^{T} \mathbf{h}_t^{(L)}
+\end{equation}
+
+producing a 384-dimensional vector $\mathbf{e}$. This vector is then L2-normalised:
+
+\begin{equation}
+    \hat{\mathbf{e}} = \frac{\mathbf{e}}{\|\mathbf{e}\|_2}
+\end{equation}
+
+
+\subsubsection{Retrieval}
+
+The retriever encodes the query string with the all-MiniLM-L6-v2 model, which corresponds to the same embedding pipeline as the indexing one, and then the query is matched with a set of retrieved results. The 384-dimensional resultant is L2-normalised. This vector is then submitted to a FAISS IndexFlatIP index where the inner product is computed with each of the stored chunk vectors. Since all the vectors are unit normalised, the inner product is the similarity of cosines. The highest-ranked candidates are returned in terms of the similarity score.
+
+\textbf{Cosine Similarity}
+
+Cosine similarity compares the angle between two high-dimensional vectors that give a semantic similarity no matter how intense it is. It is computed as the dot product of the vectors divided by the product of the magnitudes of the vectors. For a query vector $\mathbf{q}$ and a chunk vector $\mathbf{d}$, it is defined as:
+
+\begin{equation}
+    \cos(\theta) = \frac{\mathbf{q} \cdot \mathbf{d}}{\|\mathbf{q}\| \|\mathbf{d}\|}
+\end{equation}
+
+Given that all vectors are normalised, the magnitude is 1.0, hence the score is simply the inner product with values between 0.0 and 1.0. A rating of 1.0 reflects complete alignment; the closer the score to 0.0, the more orthogonality. Any chunk with a score below 0.45 is dropped prior to processing, and a hard relevance floor is used to eliminate weakly relevant content.
+
+\textbf{Time-Decay Scoring}
+
+Raw cosine similarity does not take time into consideration. An article that is two years old may be quite relevant but will not be as useful as a moderately similar one that was published yesterday. To address this, each candidate is assigned a time-decay factor depending on the number of days that the parent article is old:
+
+\begin{equation}
+    s_{\text{decay}} = e^{-\lambda d}
+\end{equation}
+
+where $d$ is the article age in days and the decay rate $\lambda$ is set to 0.02. This results in a gradual depreciation of articles older than 2 or 3 years while retaining a significant freshness score, eliminating unnecessary partiality to older content when giving preference to more recent ones.
+
+\textbf{Blended Score}
+
+The cosine similarity score and the time-decay score are combined into a single blended ranking score:
+
+\begin{equation}
+    s_{\text{final}} = 0.7 \cdot s_{\text{cosine}} + 0.3 \cdot s_{\text{decay}}
+\end{equation}
+
+The weight of semantic similarity is 70\% and freshness is 30\%. This combination maintains topical relevance as the primary cue but applies freshness as a tiebreaker should there exist a close call in scores. This blended score is used to rank the candidates with the five highest selected moving to reranking. A hard filter of 730 days is also applied; any chunk older than that is excluded regardless of similarity.
+
+\textbf{CrossEncoder Reranking}
+
+The original FAISS output is based on a bi-encoder which encodes query and chunk independently, producing coarse-grained relevance. In order to refine this ranking, the CrossEncoder model \texttt{cross-encoder/ms-marco-MiniLM-L-6-v2} reevaluates every candidate. In this model the query and chunk are concatenated into a single input and jointly encoded, such that token-level interactions can occur that the bi-encoder is unable to capture. It generates a scalar relevance score for each pair and the candidates are re-ranked. The top-K chunks with the best scores after this step are sent to the generation component.
+
+\subsubsection{Augmentation}
+
+Reranking is followed by a combination of the final list of pertinent chunks and the initial user query to create a structured prompt. The prompt places the chunks above the question, instructing the language model to use the presented context to formulate its response instead of drawing on its own knowledge. This step is necessary as the model otherwise generates answers from its frozen training data, which may be outdated or hallucinated. The system maintains factually grounded responses by pre-loading verified, source-attributed content.
+
+Since the context window of the language model is constrained, every chunk is truncated to 1200 characters so that the entire prompt including the query fits within the input limit of the custom small model. The final prompt is then passed to the generator with a temperature of 0.1 and greedy decoding, producing deterministic output that is closely related to the material provided.
+
+\subsubsection{Generation}
+
+The augmented prompt is provided to a small language model that is custom fine-tuned and generates the response. The prompt includes the retrieved context chunks and the query created by the user, and the model provides a response based solely on that context. It is beneficial to use a domain-specific model rather than a general model to maintain the tone and style of Nepali news content and not to be distracted by irrelevant information.
+
+\textbf{Tunable Parameters and Their Effect}
+
+The retrieval stage exposes several parameters that directly control the quality and coverage of what the generator receives as context. Their adjustment consists of trade-offs rather than universally correct values.
+
+The minimum cosine similarity threshold governs the strictness of the relevance floor. Setting it high will include only chunks that are close matches to the query, which enhances precision but exposes it to the chances of eliminating relevant material that has been phrased differently. When the threshold is excessive, the generator may refuse to respond or respond half-heartedly. Reducing the threshold increases the size of the pool, which boosts recall and decreases refusals, but also adds loosely related chunks that introduce noise and draw the response away from the correct information.
+
+The top-K parameter decides the number of chunks assembled into the final generation context. A higher top-K gives broader coverage, which is useful when a query requires synthesising information from multiple sources. Nevertheless, a larger top-K also increases the likelihood of incorporating marginally relevant or contradictory chunks, resulting in inconsistent or unfocused answers. A smaller top-K keeps the context tight and focused, producing sharper answers to narrow factual questions but potentially missing supporting evidence for questions that demand wider context.
+
+The decay rate controls how aggressively older articles are down-weighted during retrieval. A high decay rate causes freshness scores to decline quickly with age, meaning the generator tends to receive recent content almost always, even when older articles are more semantically relevant. This is appropriate when recency is critical but harmful when the topic benefits from older authoritative sources. A lower decay rate flattens the freshness curve, allowing older articles to compete on semantic relevance alone. This improves coverage for historical or slowly evolving topics but may occasionally surface outdated information on time-sensitive queries.
+
+The semantic weight and freshness weight together determine the balance between these two signals in the final ranking score. Increasing semantic weight biases the ranking toward topical relevance, making the system behave closer to a pure vector similarity search. Increasing freshness weight shifts the ranking toward recency, such that the generator may receive very recent articles even when they are only loosely related to the query. Adjusting these two weights is the primary mechanism for tuning the relevance and timeliness balance of the context delivered to the generator.
