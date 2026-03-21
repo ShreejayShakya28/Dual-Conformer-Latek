@@ -1,6 +1,6 @@
 \newpage
 \section{\MakeUppercase{SYSTEM ARCHITECTURE AND METHODOLOGY}}
-\subsection{Proposed System Architecture}
+\subsection{System Architecture}
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-SuperMainArchitecture.drawio.pdf}
@@ -14,16 +14,39 @@ Once transcription is completed, the resulting text is forwarded to a Small Lang
 Finally, the generated text response is converted into speech using a Text-to-Speech (TTS) module based on the user's prompt configuration. The text response is also provided directly as an output. 
 
 \subsection{Automatic Speech Recognition}
-\subsubsection{Proposed Architecture of ASR}
+\subsubsection{Architecture of ASR}
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{Images/ASR/Methodology/ASR-Main Architecture.drawio.pdf}
-    \caption{Proposed Architecture of ASR}
+    \caption{Architecture of ASR}
 \end{figure}
-
+The ASR subsystem uses two different Conformer-based models to process english and nepali speech input. The FastConformer architecture based on EncDecCTCModelBPE is used to process English speech and the IndicConformer architecture based on EncDecHybridRNNTCTCBPEModel is used to process Nepali speech. Both models are also trained on NeMo benchmarks and have the same overall design, a convolutional front-end, a series of Conformer encoder layers, and a CTC decoding head, but have different model dimensionality, vocabulary size, and encoder layers, since they are trained on different scale data and linguistic complexity data.
+\begin{table}[H]
+\caption{Model Configuration Comparison: FastConformer (English) vs IndicConformer (Nepali)}
+\label{tab:conformer_comparison}
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Parameter} & \textbf{FastConformer (English)} & \textbf{IndicConformer (Nepali)} \\
+\hline
+Model class & EncDecCTCModelBPE & EncDecHybridRNNTCTCBPEModel \\
+Language & English & Nepali (Indic) \\
+Encoder hidden dim & 176 & 512 \\
+Encoder layers & 16 & 17 \\
+FFN expansion ratio & $4\times$ (176 $\to$ 704) & $4\times$ (512 $\to$ 2048) \\
+Conv kernel size (depthwise) & 31 & 31 \\
+Attention dim & 176 & 512 \\
+Vocabulary size & 1025 (BPE) & 5633 (BPE) \\
+CTC projection & Conv1d(176, 1025) & Conv1d(512, 5633) \\
+Decoding path used & CTC & CTC only \\
+\hline
+\end{tabular}
+\end{table}
 \subsubsection{Feature Extraction}
+Both models have the same front end preprocessing pipeline that is an AudioToMelSpectrogramPreprocessor using a FilterbankFeatures featurizer. The raw audio waveforms are converted into mel-frequency filterbank features and these features are then sent to the encoder. Both models use the same technique of the preprocessing pipeline since both are trained on 16 kHz speech data.
+
 \textbf{Sampling Rate}\\
-This sample rate is consistent across the LibriSpeech datasets, which ensures consistency across all inputs (for training as well as inference). It is also a common practice in speech processing. Human speech typically contains most of its important information in the frequency range up to 8 kHz. According to the Nyquist theorem, to accurately capture frequencies up to 8 kHz, we need at least 2 × 8,000 = 16,000 samples per second
+Audio input is resampled to a standard rate of 16,000 Hz (16 kHz) before the extraction of features. This provides consistency in training as well as inference. The frequency range of human speech has most of the perceptually important information in the range of frequencies up to 8 kHz. The Nyquist theorem states that at least 2 x 8,000 = 16,000 samples per second must be used to reproduce frequencies up to 8 kHz with perfect accuracy. 
 
 \textbf{Windowing}
 \begin{itemize}
@@ -51,17 +74,50 @@ This sample rate is consistent across the LibriSpeech datasets, which ensures co
 \end{itemize}
 
 \subsubsection{Spectrogram Augmentation}
-The model’s overall performance is improved by adding spectrogram augmentation as a way to modify the data. Here, the features of the input spectrogram are modified by means of time masking , frequency masking , and time warping . To apply time masking, consecutive periods on the spectrogram are set to zero, yet for frequency masking, it is the continuous frequency lines that are masked. Also, bending time adds non-adjustable changes to the time axis in the spectrogram by moving it along a smooth curve, much like changes in a person’s speaking rhythm. With these changes, the model works on features that are robust to acoustic variables, for example, faster speech, altered background noise, or sudden pitch changes. Augmentation with spectrograms in training prevents the Conformer from becoming attached to individual sound patterns and makes it more ready for handling a wide range of noises.
+Both models apply spectrogram augmentation during training through a SpectrogramAugmentation module. The English FastConformer uses SpecAugment, while the IndicConformer uses both SpecAugment and SpecAugmentNumba — a GPU-accelerated implementation of the same algorithm. Spectrogram augmentation is applied only during training and is disabled at inference time. Two augmentation strategies are applied:
+
+\begin{itemize}
+\item \textbf{Time masking}: sequential time intervals in the mel spectrogram are initialised to zero. This imitates time-based acoustic dropouts in the form of momentary silence or other noise momentarily which causes the model to learn representations that are not dependable on either a time segment.
+
+\item \textbf{Frequency masking}: Mel spectrogram frequency channels next to each other are set to zero. This makes it so that the model will not be dependent on a specific frequency band and its resistance to spectral distortion, channel mismatch, and varying background noise properties.
+\end{itemize}
+
+Combined, these masking techniques ensure that the Conformer encoder does not overfit itself to certain acoustic patterns within the training set, increasing generalisation to variable speaking rates, recording conditions and microphone properties.
+
 
 \subsubsection{Convolutional Subsampling}
-In the stage of convolutional subsampling, Conformer is particularly useful for ASR tasks because input speech audio sequences can be very long and processing them is heavy computationally. Subsampling mainly seeks to lower the time frame of the input data without losing important details. ASR often works with Mel-spectrograms that are created at a rate of 10 milliseconds each frame. But working on such sequences straight away is inefficient because several of them have redundant neighboring frames. So, the sequence was subsampled through convolutional networks, decreasing the time resolution of each frame from 10ms to 40ms. Using strided convolution or pooling, the compression makes the model work more efficiently and achieve the same results. For example, the first stride of 2 in the convolution halves the size of the sequence to 6 samples and the resolution becomes 20ms. A second stride of 2 gives a sequence of 3 samples and 40ms resolution. By using these two steps, the sequence is compressed properly while keeping the main elements of the audio quality.
+A ConvSubsampling module is used before a layer of Conformer encoder modules receives the mel-spectrogram features. Extracted raw mel spectrograms at a 10 ms frame shift result in very long input sequences, i.e. a 10s utterance generates 1,000 frames, that are computationally expensive to the self-attention mechanism in the Conformer, whose complexity increases with sequence length. The  convolutional subsampling step downsamples the input by 4 times in time, and this results in the encoder being much more efficient with no critical acoustical data loss.
 
-While frames separated by 10ms include a lot of details, this level of detail is usually not important for further use in the speech processing. The model pays attention to important patterns for recognition when data is subsampled to 40ms. Moreover, computational costs are greatly reduced because each layer of the Conformer gets smaller input vectors by working on trimmed parts of the sequences.
+Subsampling module is composed of two consecutive layers of Conv2d, and they have 3x3 kernel size and stride 2x2, and then ReLU activations. The consecutive stride-2 operations simultaneously reduce the time dimension by 4 times a sequence of 10 ms per frame is reduced to 20 ms per frame with the first convolution, and 40 ms per frame with the second. This resolution (40 ms/frame) is good enough to recognize speech at the phoneme level since the 10 ms time window of two adjacent frames is well correlated and has much redundant acoustic data.
 
+The specific configurations for the two models are as follows:
+
+\begin{table}[H]
+\caption{ConvSubsampling layer dimensions}
+\label{tab:convsubsampling_dimensions}
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Parameter} & \textbf{Fast Conformer} & \textbf{Indic Conformer} \\
+\hline
+Conv layer 1 & Conv2d(1, 176, 3$\times$3, stride 2) & Conv2d(1, 512, 3$\times$3, stride 2) \\
+Activation 1 & ReLU & ReLU \\
+Conv layer 2 & Conv2d(176, 176, 3$\times$3, stride 2) & Conv2d(512, 512, 3$\times$3, stride 2) \\
+Activation 2 & ReLU & ReLU \\
+Temporal reduction & 4$\times$ (10 ms $\to$ 40 ms) & 4$\times$ (10 ms $\to$ 40 ms) \\
+\hline
+\end{tabular}
+\end{table}
 
 \subsubsection{Linear}
 
-Conformer uses a linear layer in the model after the first process of convolutional subsampling to map the newly subsampled features into a larger space. This step is required because it brings the feature dimensions to the size of the hidden layers used by Transformer and convolutional modules. To explain this, the linear block picks the results from the downsampling, which lowers the time resolution and extracts local details, and completes the process by adding an extra layer to increase its dimensions. Doing this makes sure the achieved representation is able to hold detailed acoustic details and blends well with the self-attention and feed-forward modules from the Conformer design. This kind of design gives a balance between performance and calculations, helping the Conformer perform well in speech recognition.
+Conformer uses a linear layer in the model after the first process of convolutional subsampling to map the newly subsampled features into a larger space. This step is required because it brings the feature dimensions to the size of the hidden layers used by Transformer and convolutional modules. To explain this, the linear block picks the results from the downsampling, which lowers the time resolution and extracts local details, and completes the process by adding an extra layer to increase its dimensions. Doing this makes sure the achieved representation is able to hold detailed acoustic details and blends well with the self-attention and feed-forward modules from the Conformer design. This kind of design gives a balance between performance and calculations, helping the Conformer perform well in speech recognition.The convolutional front-end has this linear projection to guarantee that the output of each Conformer layer can be dimensionally compatible with the self-attention and feed-forward modules.
+
+\begin{itemize}
+    \item \textbf{Fast Conformer(English)}: Linear(in\_features=3520, out\_features=176). The 3520-dimensional input is the product of the 176-channel convolutional output and the frequency dimension after two stride-2 operations on 80 mel bins (80 / 4 = 20 frequency bins × 176 channels = 3,520). The output is a 176-dimensional embedding.
+
+    \item \textbf{Indic Conformer(Nepali)}: Linear(in\_features=10240, out\_features=512). The 10240-dimensional input comes from 512 convolutional channels × 20 frequency bins. The output is a 512-dimensional embedding aligned with the Conformer encoder's model dimension.
+\end{itemize}
 
 \subsubsection{Dropout}
 
@@ -76,6 +132,9 @@ In the inference part, dropout is not utilized, so the model can use all its dat
         \includegraphics[scale=1]{Images/ASR/Methodology/ASR-ConformerBlock.drawio.pdf}
         \caption{Conformer Architecture}
     \end{figure}
+The acoustic modelling element of the two ASR systems is the Conformer encoder. It works by stacking several of the same ConformerLayer blocks and each block is an assembly of multi-headed self-attention and local convolutional processing in a sandwich structure of macaron nets. FastConformer encoder employs 16 layers and the model dimension is 176 whereas IndicConformer encoder employs 17 layers and its model dimension is 512. Each layer has the same structure, and it is just the size that is different.
+
+Every ConformerLayer has five sub-modules used in sequence, where first Feed Forward Module (FFN1), a Multi-Headed Self-Attention Module (MHSA), a Convolution Module (Conv), a second Feed Forward Module (FFN2), and a final Layer Normalisation. This structure, based on Macaron-Net, encircles the attention and convolution modules between two half-weighted feed-forward modules enabling the model to detect both regional and global speech patterns in a combined expression.
 
 \textbf{Feed Forward Module}
 
@@ -98,7 +157,14 @@ All FFNs start off with layer normalization , ensuring that the mean and varianc
         \includegraphics[scale=1]{Images/ASR/Methodology/ASR-ResMHA.drawio.pdf}
         \caption{Block Diagram of Multi-Head Self Attention with Relative Positional Embedding}
     \end{figure}
+The self-attention sub-module gives attention to the long distance relationships in the entire sequence of the speech. It employs Relative Position Multi-Head Attention, which adds relative positional encoding to the attention score computation instead of appending some fixed absolute positional encoding to the input. This enables the model to extrapolate to utterances of varying lengths and also to be sensitive to the relative position of the frames instead of the absolute position of the frame within the sequence.
+There are four known linear projections in the attention module which include query (Q), key (K), value (V) and output that all take place in the hidden dimension of the model. One more linear projection (linear\_pos) gives positional bias terms utilized in the calculation of the relative attention score. The attention weights are dropped (p=0.1). Layer Normalization comes before the module. The specific dimensions are:
+\begin{itemize}
+    \item \textbf{Fast Conformer(English)}:  All projections are Linear(176, 176). With a model dimension of 176 and 4 attention heads, each head operates over a 44-dimensional subspace.
 
+    \item \textbf{Indic Conformer(Nepali)}: All projections are Linear(512, 512). With a model dimension of 512 and 8 attention heads, each head operates over a 64-dimensional subspace.
+\end{itemize}
+ 
 \textbf{Convolution Module}
     \begin{figure}[H]
         \centering
@@ -223,6 +289,11 @@ is denoted by
 \begin{equation}
 	\mathcal{B}^{-1}(\mathbf{y}).
 \end{equation}
+\begin{itemize}
+    \item \textbf{Fast Conformer(English)}: Conv1d(176, 1025, kernel size=1). Projects the 176-dimensional encoder output to a 1025-token vocabulary (1024 BPE subword units + 1 blank token).
+
+    \item \textbf{Indic Conformer(Nepali)}: Conv1d(512, 5633, kernel size=1). Projects the 512-dimensional encoder output to a 5633-token vocabulary (5632 BPE subword units + 1 blank token, with padding\_idx=5632).
+\end{itemize}
 
 \textbf{CTC Objective}
 
