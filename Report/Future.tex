@@ -1,2 +1,19 @@
 \newpage
-\section{\MakeUppercase{Future Enhancement}}
+\section{Future Enhancements}
+
+While the current system achieves strong results across all components and successfully demonstrates the reliability of a modular bilingual speech-to-dialogue pipeline, several approaches for improvements remain that could significantly advance the system's capabilities, accuracy, and real-world applicability.
+
+\subsection{Improved ASR Performance}
+For the Nepali IndicConformer, the WER of 31.40\% on clean speech, while competitive against existing Whisper variants, leaves considerable room for improvement. Collecting and curating larger Nepali speech, incorporating more diverse speaker demographics and dialectal variation, and exploring larger Conformer variants would likely provide additional gains. Additionally, replacing greedy decoding with beam search combined with an external Nepali language model could further reduce transcription errors without modifying the acoustic model itself.
+
+\subsection{Larger and More Capable Language Models}
+The current SLM was pretrained with a relatively small parameter count to satisfy local inference constraints. As hardware availability improves, replacing or augmenting the custom SLM with a larger pre-trained open-source language model such as a fine-tuned variant of LLaMA, Mistral, or Phi would improve response quality, factual accuracy, and conversational coherence. Instruction fine-tuning on dialogue datasets would further align the model's outputs with user expectations in a question-answering context.
+
+\subsection{Enhanced RAG Pipeline}
+The current RAG knowledge base is populated with scraped news articles covering a fixed time window. Several enhancements could improve retrieval quality and coverage. First, implementing automatic and scheduled web scraping would keep the knowledge base continuously updated with the latest news and events, eliminating the need for manual re-indexing. Adopting more sophisticated chunking strategies such as semantic chunking or parent-document retrieval, alongside stronger embedding models fine-tuned on Nepali and English news text, would improve retrieval precision. Incorporating hybrid retrieval combining dense vector search with sparse keyword-based BM25 retrieval would improve performance on queries that rely on specific named entities, numbers, or rare terms that dense embeddings may underweight. Finally, adding a re-ranking step using a cross-encoder model after the initial retrieval would further filter and prioritize the most relevant context passages before they are passed to the SLM.
+
+\subsection{Real-Time and Streaming Inference}
+The current pipeline processes audio as a whole audio, introducing end-to-end latency that makes real-time conversational interaction difficult. Adapting the ASR components to support streaming inference processing audio in chunks as it arrives rather than waiting for the full utterance would significantly reduce perceived latency. Combining this with incremental generation in the SLM would move the system toward a genuine real-time dialogue experience suitable for voice assistant and customer service applications.
+
+\subsection{Speaker Diarization and Multi-Turn Dialogue}
+The current system treats each query independently without maintaining conversation history. Including a dialogue state management that tracks the conversation context across multiple turns would enable more natural, coherent interactions. Additionally, integrating speaker diarization the ability to identify and separate multiple speakers in an audio stream would allow the system to handle group conversations and meeting transcription scenarios, broadening its practical application domains.
