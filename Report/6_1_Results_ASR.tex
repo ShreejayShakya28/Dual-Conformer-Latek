@@ -2,6 +2,117 @@
 \section{\MakeUppercase{Result and Analysis}}
 	
 \subsection{ASR}
+\subsubsection{Word Error Rate (WER) Comparison and Analysis in FastConformer}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/WER_LibriSpeech.png}
+	\caption{WER on LibriSpeech}
+\end{figure}
+
+\begin{table}[H]
+	\centering
+	\begin{tabular}{|l|c|c|}
+		\hline
+		\textbf{Model} & \textbf{WER} & \textbf{Parameters} \\
+		\hline
+		Deep Speech 2 & 5.33 & 110M \\
+		Gated ConvNets & 4.8 & 100M \\
+		Seq-to-Seq Attention (LSTM Based) & 3.82 & 50M--100M \\
+		Convolution Speech Recognition & 3.26 & 30M--70M \\
+		wav2vec-wav2letter & 2.7 & 30M / 50M \\
+		Transformer & 2.6 & 60M--100M \\
+		Squeezeformer (L) & 2.47 & 50M \\
+		LSTM Transducer & 2.23 & 40M--80M \\
+		Conformer (M) & 2.0 & 50M \\
+		Stateformer & 1.76 & 40M--60M \\
+		\textbf{Fast Conformer} & \textbf{6.14} & \textbf{13.2M} \\
+		\hline
+	\end{tabular}
+	\caption{Word Error Rate (WER) and parameter count of models trained on the LibriSpeech dataset}
+	\label{tab:wer_librispeech_models}
+\end{table}
+The fine-tuned model has only 13.2 million parameters, which is about 4x to 8x times fewer than smaller architectures (e.g., Conformer-M, ~50 million parameters) and larger ones (e.g., DeepSpeech 2, ~110 million parameters). This compactness makes the architecture very compatible with edge devices and low-latency applications. The encoder is 98.6\% of the total number of parameters, meaning that it washes up all the model capacity, the decoder is insignificant, consisting of only 181K  parameters. This distribution is consistent with CTC based structures that avoid the use of complicated auto-regressive decoders, which limit both memory size and inference complexity.
+
+The achieved WER of 6.14\% per cent is higher than the performance of higher-ranking models, most of which use three to eight times the number of parameters and large amounts of data augmentation, nevertheless, it is a strong performance-per-parameter trade-off. In the case of a situation where constraints in model size, power consumption, or real-time response are involved, the existing model provides a realistically compromised state. The use of a CTC-BPE hybrid output scheme avoids the use of outside language models during decoding, which simplifying the scheme, rather than the many transducer or attention-based models, retains a reasonable degree of sub-word level generalization.
+
+The WER of the model can be further improved to 4.08\% when using greedy decoding, a relatively inexpensive method of choosing the most likely token at each iteration without using a beam search or outside language model rescoring. The only difference is that this can be seen in the red dashed line (Overall WER: 4.08\%), much lower than the green dashed line that shows the average WER (4.49\%), across utterances, shows that not only does greedy decoding increase average accuracy, but also makes performance less varied. This finding highlights the strength of the CTC-BPE hybrid output layer: it is simple with limited decoder footprint, but it produces highly competitive transcription quality, particularly when the factors of inference constraints are important and marginal gains in complex modes of decoding are traded in at the cost of latency and compute efficiency.
+
+\subsubsection{WER, CER and Size Analysis of IndicConformer}
+ 
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|r|r|}
+\hline
+\textbf{Model} & \textbf{Parameters} & \textbf{WER (\%)} \\
+\hline
+Whisper Tiny & 39M & 101.8 \\
+Whisper Base & 74M & 102.4 \\
+Whisper Small & 244M & 69.5 \\
+Whisper Medium & 769M & 54.4 \\
+IndicConformer finetuned & 129M & 31.40 \\
+\hline
+\end{tabular}
+\caption{WER (\%) on Clean Fleurs Test Set}
+\label{tab:clean_wer}
+\end{table}
+The clean Fleurs test set results demonstrate that there is a clear comparison of the various Whisper models and the fine-tuned IndicConformer model. Although the models of Whisper get better as they get larger, as Whisper Tiny and Base have very bad WER of 100 and above and 69.5 and 54.4 percent, they are still 10 times worse than the model of IndicConformer that was finetuned. Although it has less parameters (129M), the fine-tuned IndicConformer shows a much lower WER of 31.40\%. This comparison indicates that the IndicConformer fine-tuned model is more effective than all variants of Whisper, which emphasizes that fine-tuning and architecture design play a greater role in the model rather than adding more size to it.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{|l|l|c|c|c|c|c|}
+\hline
+\rule{0pt}{3ex}\textbf{Model} & \textbf{Type} & \textbf{Size} & \textbf{CER} & \textbf{WER} & \textbf{\shortstack{Global \\[2pt] CER}} & \textbf{\shortstack{Global \\[2pt] WER}} \\
+\hline
+IndicConformer & NeMo (original) & 493.05 & 15.03 & 35.59 & 13.35 & 33.88 \\
+IndicConformer & NeMo (finetuned) & 493.05 & 14.24 & 33.75 & 13.27 & 32.55 \\
+IndicConformer & ONNX (full) & 470.22 & 14.24 & 33.75 & 13.88 & 32.49 \\
+IndicConformer & ONNX (quantized) & 133.94 & 16.08 & 37.96 & 15.01 & 36.77 \\
+\hline
+\end{tabular}
+\caption{Accuracy Metrics on Noisy Fleurs Test Set}
+\label{tab:noisy_accuracy}
+\end{table}
+
+The table compares the performance in noisy environments, which gives the character error rate (CER) and word error rate (WER) and global measures. The original NeMo IndicConformer has a CER of 15.03\% and WER of 35.59\%. Once finetuned, the model becomes significantly better: CER declines to 14.24\% and WER declines to 33.75, indicating that finetuning is not only helpful in improving clean speech, but also enhances noise resistance. The trend of global measures is similar, as global CER has decreased to 13.27\% and global WER to 33.55\%, which means that all measures gain continuously throughout the whole data range.
+
+The ONNX full model has the same CER and WER as the finetuned NeMo model with a slight reduction of the model size to 470.22 MB. The ONNX quantized model which is optimized to run at 133.94 MB only, experiences a slight degradation: CER increases to 16.08\% and WER to 37.96\%, with global CER/WER also on the rise, a classic trade-off between model size and accuracy.
+
+\subsubsection{Qualitative Analysis}
+To illustrate examples of model predictions on held-out utterances, below there are three representative samples, each paired with its ground-truth reference, the model’s hypothesis, and the corresponding Word Error Rate (WER):
+
+These examples demonstrate that the model accurately captures most of the semantic content. Errors are primarily lexical (e.g., “latter” vs. “latter day”, “to day” vs. “today”) or morphological, which are common in CTC-based systems without external language models. Notably, the model achieves perfect transcription on complex formal language in the second example, highlighting its robustness on well-articulated speech
+
+\subsubsection{Training Dynamics}
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochTrain_Loss.png}
+	\caption{Epoch-wise Training Loss}
+\end{figure}
+
+Training Loss (Figure 6-1) decreases steadily from 36.2 to 31.2, indicating consistent learning.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochVal_Loss.png}
+	\caption{Epoch Wise Validation Loss}
+\end{figure}
+Validation Loss (Figure 6-2) shows a similar downward trend, reaching 37.9 at epoch 7, with only minor fluctuations (e.g., a small uptick at epoch 5), suggesting good generalization without severe overfitting.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/BestVal_Loss.png}
+	\caption{Best Validation Loss (Cumulative Minimum)}
+\end{figure}
+The Best Validation Loss (Figure 6-3) is monotonically non-increasing, confirming that the best checkpoint improves over time.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochGradient_Norm.png}
+	\caption{Gradient Norm per Epoch}
+\end{figure}
+The Gradient Norm (Figure 6-4) drops rapidly in early epochs and stabilizes around 180–185, signaling convergence and stable optimization. Collectively, these curves confirm a stable, well-behaved training process with no signs of divergence or instability.
+
 \subsubsection{Dataset Preperation}
 The Automatic Speech Recognition (ASR) datasets are usually based on 16 kHz mono audio due to the effective tradeoff between speech intelligibility and computational efficiency. The 16 kHz sampling frequency, which is based on the Nyquist theorem, retrieves the frequencies up to 8 kHz- the range that is most important to the human voice- without introducing the high-frequency data that is not necessary and beneficial to the recognition performance as offered by higher rates such as 44.1 kHz. Also, mono (single-channel) audio is common in ASR systems since recognition is based on phonemes and time, and not space or direction; downmixing stereo audio to mono reduces memory space by half, makes preprocessing and model construction much easier, and does not lose speech content that is important. Combined, these decisions help to cut down on data size and computational load to support faster and more efficient model training and inference without compromising accuracy.
 
