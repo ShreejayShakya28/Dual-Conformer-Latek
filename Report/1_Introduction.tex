@@ -2,22 +2,21 @@
 \section{\MakeUppercase{Introduction}}
 
 \subsection{Background}
-The application of voice-based interfaces range from transcription to customer service bots. Accurate speech-to-text conversion and understanding language in context aware manner are essential for implementation of these systems. However, building integrated ASR-LLM systems is complex, making it difficult to scale individual components for specific tasks.
+The application of voice-based interfaces has a range from transcription to customer service bots. Accurate speech-to-text conversion and the ability of understanding language in a context-aware way is essential to the implementation of these systems. However, it is complicated to build integrated ASR-LLM systems, and as such, its individual components are hard to scale up for specific tasks. Automatic Speech Recognition (ASR) and Large Language Models (LLMs) are the basic underlying technologies for modern AI that is used for conversational AI. While tightly coupled systems have the advantage of integrated performance, they are often not very flexible and hard to maintain. This project follows a modular strategy, which separates ASR, language modeling and retrieval components for better scalability and independent optimization.
 
-Automatic Speech Recognition (ASR) and Large Language Models (LLMs) are the basic foundational technologies for modern AI used for conversational AI. While the whole system offers integrated performance, they often lack flexibility and are difficult to maintain. This project implements a different modular approach, decoupling ASR and LLM components to enhance scalability and independent optimization. The ASR system is designed using a Conformer-based Transformer architecture with Residual Multi-Head Attention (ResMHA) to improve the accuracy of transcripts and modeling of long-range contexts. The output is processed by a lightweight, custom LLM that makes sure of dialogue generation that is efficient and coherent. This design of the pipeline enables easier upgrades while also maintaining strong overall system performance.
+The system supports bilingual speech input with the support of a Quantized Indic Conformer model for Nepali and FastConformer model for English to enable accurate transcription for both languages. Transcriptions in Nepali are fed through a translation module, and then to the Small Language Model (SLM), and in English by default. The SLM uses a Retrieval-Augmented Generation (RAG) approach, at inference time, by querying a FAISS-backed knowledge base of recent news of 2 years and events to generate responses that are backed by current, domain relevant information as opposed to just parametric knowledge. This greatly curbs hallucination and knowledge staleness, two inherent shortcomings of stand-alone language models. Finally, the system provides bilingual audio output with parallel English and Nepali Text-to-Speech modules, so that responses can be provided in the user's desired language. This modular pipeline design allows for easier upgrades of individual components without having to sacrifice the overall system performance.
 
 \subsection{Motivation}
-Most modern conversational AI systems are built with Automatic Speech Recognition (ASR) and Large Language Models (LLMs) as their core parts. Even so, most existing frameworks combine these parts in a close or full connection which makes them less flexible, scalable and harder to interpret. Errors in different sections of such models tend to spread without being caught and optimizing one section usually means retraining all parts of the model. This brings a lot of difficulties in saving time, handling new domains and ensuring the software is simple to manage. This makes it important for new and existing pipelines to be decoupled and composed of components that can be individually developed, refined and changed without affecting all the other components.
+The last few years has seen the rapid development of Automatic Speech Recognition (ASR) and Large Language Models (LLMs) that has given birth to conversational spoken dialogue systems. However, the current paradigm of tightly coupled, end-to-end Speech-LLM integration causes a lot of engineering friction. Deep acoustic linguistic techniques like AudioGPT and Style Talker explore deep acoustic linguistic fusion, but the single system architecture used in such methods requires paired training data of audio text, an uncommon need creating architectural constraints to upgrade components as well as require re-training of the entire system to fix the problem of a single component. These limitations are translated into long iterations, high computational costs and reduced transparency of failure locations for researchers and production engineers.
 
-The main goal is to develop a more functional and expandable system for speech-to-dialogue by having each component run alone but still connected together. Because we separate these modules, we can improve just one area of the system such as transcription or speech, without the need for general retraining. Besides, such architecture allows specific changes to be added easily, so the system can work well in customer service, personal assistant and real-time captioning roles.
+A loosely coupled, modular pipeline is a simple solution to these limitations and, more importantly, gives a unique class of practical advantages that cannot be achieved in tightly structured systems. Through a clean textual interface, ASR and LLM can be decoupled, allowing independent training of these two modules, which implies that the ASR encoder can be trained on large transcribed sets of speech data to acquire better acoustic robustness and noise resistance, while the LLM can be trained on domain-specific dialogues without any knowledge about the internals of ASR. This division of labour greatly speeds up prototyping. Similarly, the LLM can be retrained to fulfill a new domain or safety profile, without reprocessing any audio data.
 
-Our model uses progressive temporal downsampling which decreases the amount of effort and delay needed in real-time tasks and does not harm the quality of transcriptions. After that, the improved ASR system’s output goes into a lightweight custom LLM meant for managing tokens and creating smooth dialogue. While Style-Talker is good at saving voice qualities and producing responsive answers, it gives up being modular and adaptable. It covers the trade-offs, however, it is most concerned with increasing flexibility and making the system work better rather than focusing on small improvements in how the AI speaks. Overall, the purpose of the pipeline is to show that a carefully planned, separated architecture is able to perform competitively and provide more control, clarity and expandability fitting well for continuous development in real situations.
+Moreover, this architecture is in the ideal position to take advantage of the growing ecosystem of lightweight pretrained models that are available publicly. Rather than training monolithic billion parameter networks, one can use a pipeline consisting of small efficient checkpoints: Conformer-based ASR models pretrained on large datasets of speech and decoder-only transformer large language models with compact footprints that can provide competitive reasoning at a fraction of the parameter count of frontier models. As a result, production-oriented systems can be built, fine-tuned, and launched quickly under small compute budgets, which reduces the threshold for customization of applications tailored for a specific domain, such as customer service automation, real-time captioning, and personal assistant applications.
 
 \subsection{Problem Definition}
-Modern Automatic Speech Recognition (ASR) and Large Language Model (LLM) systems face several practical challenges that limit their adaptability and accessibility. These systems often tightly couple the speech recognition and language generation components, making it difficult to optimize or replace individual modules independently. This lack of modularity hinders experimentation and innovation. This can be improved by a modular architecture consisting of independent ASR and Language model.
+Modern automatic speech recognition (ASR) and language generation systems have a number of practical problems that constrain the flexibility, availability, and inclusiveness of these systems. The majority of architectures make speech recognition and language generation modules closely coupled, leading to the formation of unified pipelines in which errors spread easily and it is common to retrain the entire system to optimize a single component. This creates a barrier to the quick experimentation process, adds to maintenance costs, and makes the system hard to adapt to new domains or languages, especially low-resource Indic languages such as Nepali. The majority of existing pre-trained small language models (SLMs) are general-purpose and English-centric, and do not have strong support for multilingual or domain-specific settings. Specializing these models to particular tasks, such as news summarization or conversational assistance in Nepali, usually requires a huge amount of computational power, complicated retraining pipelines, and high-level technical knowledge. Even simple updates may cause extensive retraining of the entire system, slow the process of iteration, and add impediments to localized deployment.
 
-Most pre-trained models are built for general-purpose tasks and are not easily adaptable to domain-specific datasets. Fine-tuning them often involves complex retraining pipelines or full-system adjustments, which are time-consuming and demand deep technical expertise.
-Even minor changes frequently require retraining the entire system, increasing maintenance effort and slowing down iteration cycles. Having a modular architecture allows for easier fine tuning and customized models that are easier to train and implement.
+In response to these issues, this project hypothesizes a modular, decoupled architecture that unites the ASR module with a quantized, lightweight small language model (SLM). The system can focus on efficiency and modularity, thus allowing speech transcription and dialogue generation to be individually optimized, fine-tuning of domain-specific and multilingual tasks to be easier, and local inference to be performed without compromising responsiveness. This strategy, combined with an active knowledge base of recent news articles, guarantees timely, comprehensive, and affordable AI support to both English and Nepali speakers.
 
 \subsection{Objectives}
 The objectives of our project are: 
@@ -30,18 +29,47 @@ The objectives of our project are:
 
     \subsubsection{Applications}
     \begin{itemize}
-        \item \textbf{AI Assistant With Conversational Ability: }The pipeline supports virtual assistants that accurately understand speech and generate natural language responses, enabling personalized and scalable user interactions.
-        \item \textbf{Domain-Specific Information Systems: }The modular design allows for easy fine-tuning and adaptation to specialized fields such as healthcare, legal, and finance, where precise speech understanding is critical.
-        \item \textbf{Language Learning and Pronunciation Tools: } With accurate transcription and feedback capabilities, the system can be integrated into educational platforms to help learners improve speech and acquire new languages.
+        \item \textbf{Voice Assistant and Speech Interaction Bilingual}
+        
+        The decoupled architecture can be used to quickly prototype a bilingual assistant by independently fine-tuning the ASR or LLM on language-specific data, without having to retrain the entire system. The evaluation of new language pairs can be done fast, and the time to deploy multilingual customer service or accessibility applications is minimized.
+
+        \item \textbf{News-Aware Question Answering System}
+        
+By incorporating a RAG module the LLM can access passages in a continually updated news or domain knowledge base and then generate responses. This bases responses on existing information without model retraining making it appropriate in news briefing assistants, medical information desks and journalism query systems where currency of facts is required.
+
+        \item \textbf{Domain-Adaptive Information Systems} 
+        
+The independent fine-tuning or replacement of each of the various modules of the pipeline enables the pipeline to be a good match to the special information systems, requiring maintainability, scalability, and easier adaptation to the domain.
+
+
+        \item \textbf{Customer Service and Personal Assistant Applications}
+
+        The system is configured as a speech-to-dialogue pipeline, which could be used in customer service and personal assistant cases, where system can take voice input and reply back in audio.
+
+        \item \textbf{Meeting Transcription and Summarization Support}
+
+Meeting transcription and summarization is a viable use case in decoupled spoken-language systems, which makes this architecture appropriate to transform spoken material into text that can be efficiently processed and subsequently summarized and analyzed.
+
     \end{itemize}
     
     \subsubsection{Limitations}
     \begin{itemize}
-        \item \textbf{Latency: } The modular nature of the system introduces cumulative latency across ASR and LLM stages.
-        \item \textbf{Prosodic Inconsistency: } The decoupled ASR-to-LLM interface may result in unnatural prosody and less expressive responses, particularly when used in conjunction with downstream TTS modules.
-        \item \textbf{Error Propagation: } Transcription error from the ASR stage directly affect the LLM's response quality due to lack of feed back loop or joint optimisation.
-        \item \textbf{Resource Utilization: } While modular, the independent training of ASR and Language model component may lead to increased utlization of resources.
-        \item \textbf{Not real-time: } Due to sequential pipeline and lack of tight integration between ASR and Language model, the system is not capable of real time interaction.
+        \item \textbf{Cumulative Pipeline Latency} 
+        
+The multi-stage pipeline has compounding latency in pace with the ASR transcription, optional translation, vector retrieval, autoregressive LLM generation and TTS synthesis. Each decoupled module has a discrete inference cost and a synchronization point compared to end-to-end systems where representations flow via just one forward pass, and the next stage will not be able to start until that point. This additive accumulation is non-trivial in the face of real-time constraint, round-trip latency limits are placed on the sum of worst-case delays per-module and cross-stage joint optimization is not allowed.
+        
+        
+        \item \textbf{Loss of Prosodic and Emotional Information}
+        
+A text based interface between ASR and the language model eliminates non-textual speech data, i.e. tone, prosody and emotion which can constrain expressive understanding and naturalness in downstream speech production.
+
+        \item \textbf{Limited Suitability to Strict Real-Time Interaction}
+         
+ Although this project employs methods like temporal downsampling to achieve efficiency, the general modular and sequential structure still renders the real-time use of strict conversational interaction challenging.
+
+        \item \textbf{Reliance on Retrieval Quality and Knowledge Coverage} 
+Whereas RAG enhances the level of factual grounding and minimizes staleness, the ultimate solution remains still to rely on the quality of retrieval, the strategy of chunking and the extent to which the knowledge base is maintained so the low quality retrieval can decrease the level of relevance or completeness.
+
     \end{itemize}
 
 \pagebreak
