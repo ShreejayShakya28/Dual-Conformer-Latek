@@ -41,7 +41,7 @@ NumPy Version & 2.0.2 \\
 \subsection{Feasibility Analysis}
 
 \subsubsection{Technical Feasibility}
-
+The proposed system is technically feasible because it uses established and widely-supported technologies including Conformer-based Automatic Speech Recognition (ASR), decoder-only Transformer-based language models, and Retrieval-Augmented Generation (RAG) which all can be run on modern deep learning frameworks like PyTorch and NVIDIA NeMo on GPU-enabled platforms like Google Colab using high-performance hardware (e.g., NVIDIA A100). The further increased ease of feasibility is the modular architecture that decouples ASR and language modeling functionality and enables each of these separate modules to be developed, trained, and optimized continuously to reduce system complexity and facilitate effective experimentation. Moreover, the adoption of pretrained models, quantization, and lightweight Small Language Models (SLMs) makes the decision of making the computational demands manageable without compromising the performance with competitive standards. All these pose a problem, but design decisions, including progressive downsampling and efficient model settings, reduce them, making the system as a whole feasible and implementable within the constraints of the available technology and computer capabilities.
 
 \subsubsection{Economic Feasibility}
 The major cost includes paid online computing service such as Colab pro for training our custom conformer model and SLM. Other costs include printing and for other softwares and tools. Given the scale of the model and our dataset availability, the project is economic feasible in accordance to our proposed budget.
