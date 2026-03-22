@@ -7,7 +7,7 @@
     \caption{System Architecture}
 \end{figure}
 
-The system pipeline starts with the spoken audio of the user that is either in English or Nepali. The Interface module handles the preprocessing of the audio signal after which it is sent to the relevant Automatic Speech Recognition (ASR) pathway depending on which language is being used.In the case of Nepali audio input, the signal is run through the Quantized Indic Conformer model that caters to Indic language meaning that the speech is converted into textual transcription. This transcription is further sent to a Translation module so that it can be translated to English before being sent to the Small Language Model (SLM).With English audio input, the signal is handled in a quicker pathway by the Fast Conformer model that directly transcribes the speech into text. This is an English transcription that is directly forwarded to the SLM without need of translation.The SLM also acts on a Retrieval-Augmented Generation (RAG) basis. It has a Knowledge Base which has the news articles and information of the last two years. When a transcribed text is received by the SLM, the Retriever component is used in a search of this Knowledge Base to retrieve information that is relevant and up-to-date concerning the query made by the user. This memory context is then subjected to the language interpretation abilities of the SLM to create correct responses of context-aware nature based on the latest news and events. The output of the SLM, which is refined on a specialized dataset and optimized to perform local inference, is the combination of the query input and the knowledge retrieved to produce a coherent reply in English.At the end, two output paths are available to the English text response: one of them is to send the English text response straight to the English TTS module and to receive the audio in English and another is to translate the SLM output to nepali and send it to the Nepali TTS module and to get the audio in Nepali. This two-way mechanism offers the system the ability to support bilingual input and offer versatile multilingual output as per the needs of the user.
+The system pipeline starts with the spoken audio of the user that is in English or Nepali. The interface module handles the preprocessing of the audio signal after which it is sent to the relevant Automatic Speech Recognition (ASR) pathway depending on which language is being used. In the case of Nepali audio input, the signal is run through the Quantized Indic Conformer model that caters to Indic language meaning that the speech is converted into textual transcription. This transcription is further sent to a translation module so that it can be translated to English before being sent to the Small Language Model (SLM). With English audio input, the signal is handled in a quicker pathway by the Fast Conformer model that directly transcribes the speech into text. This is an English transcription that is directly forwarded to the SLM without need of translation.The SLM also acts on a Retrieval-Augmented Generation (RAG) basis. It has a Knowledge Base which has the news articles and information of the last two years. When a transcribed text is received by the SLM, the Retriever component is used in a search of this Knowledge Base to retrieve information that is relevant and up-to-date concerning the query made by the user. This memory context is then subjected to the language interpretation abilities of the SLM to create correct responses of context-aware nature based on the latest news and events. The output of the SLM, which is refined on a specialized dataset and optimized to perform local inference, is the combination of the query input and the knowledge retrieved to produce a coherent reply in English.At the end, two output paths are available to the English text response: one of them is to send the English text response straight to the English TTS module and to receive the audio in English and another is to translate the SLM output to nepali and send it to the Nepali TTS module and to get the audio in Nepali. This two-way mechanism offers the system the ability to support bilingual input and offer versatile multilingual output as per the needs of the user.
 
 
 \subsection{Automatic Speech Recognition}
@@ -74,7 +74,7 @@ Audio input is resampled to a standard rate of 16,000 Hz (16 kHz) before the ext
 \end{itemize}
 
 \subsubsection{Spectrogram Augmentation}
-Both models apply spectrogram augmentation during training through a SpectrogramAugmentation module. The English FastConformer uses SpecAugment, while the IndicConformer uses both SpecAugment and SpecAugmentNumba — a GPU-accelerated implementation of the same algorithm. Spectrogram augmentation is applied only during training and is disabled at inference time. Two augmentation strategies are applied:
+Both models apply spectrogram augmentation during training through a SpectrogramAugmentation module. The English FastConformer uses SpecAugment, while the IndicConformer uses both SpecAugment and SpecAugmentNumba a GPU-accelerated implementation of the same algorithm. Spectrogram augmentation is applied only during training and is disabled at inference time. Two augmentation strategies are applied:
 
 \begin{itemize}
 \item \textbf{Time masking}: sequential time intervals in the mel spectrogram are initialised to zero. This imitates time-based acoustic dropouts in the form of momentary silence or other noise momentarily which causes the model to learn representations that are not dependable on either a time segment.
@@ -166,11 +166,6 @@ There are four known linear projections in the attention module which include qu
 \end{itemize}
  
 \textbf{Convolution Module}
-    \begin{figure}[H]
-        \centering
-        \includegraphics[scale=1]{Images/ASR/Methodology/ASR-Convolution Module.drawio.pdf}
-        \caption{Block Diagram of Convolution Module}
-    \end{figure}
     \begin{enumerate}
         \item \textbf{Pointwise Convolution}
 
@@ -178,6 +173,12 @@ There are four known linear projections in the attention module which include qu
         
         With pointwise convolutions, the Conformer saves computations and improves model performance, since it skips costly spatial computations.
 
+
+    \begin{figure}[H]
+        \centering
+        \includegraphics[scale=1]{Images/ASR/Methodology/ASR-Convolution Module.drawio.pdf}
+        \caption{Block Diagram of Convolution Module}
+    \end{figure}
         \item \textbf{GLU Activation}
 
         The GLU activation function is added to bring non-linearity and make the features better represented. The input is separated into two pieces, and the “gate” part gets processed by a sigmoid function, then those values are multiplied with the remaining data. Because of gating, the model can control information being exchanged and give more attention to significant elements as needed. By using GLU on the feed-forward and convolutional layers in the Conformer increases the ability to represent speech data while maintaining a good balance between simplicity and complexity.
@@ -407,18 +408,19 @@ Softmax function helps convert raw logits from the output layer into a distribut
   \item \( K \): The total number of classes
 \end{itemize}
 
-\subsubsection{Word Error Rate (WER)}
+\subsubsection{Word Error Rate (WER) & Character Error Rate}
 Word Error Rate (WER) is the most popular metric used to evaluate the performance of the Automatic Speech Recognition (ASR) systems. It is used to measure the accuracy of transcription by comparing the hypothesis of the system to a ground-truth reference transcript.
 
+Character Error Rate (CER) is a commonly used error metric to compare the Automatic Speech Recognition (ASR) system performance on the character level. It is employed to quantify the correctness of transcription through comparison of the hypothesis of the system with a ground-truth reference transcript in terms of characters rather than words.
 
 \begin{equation}
-	\text{WER} = \frac{S+D+I}{N}
+	\text{WER | CER} = \frac{S+D+I}{N}
 \end{equation}
 
 where,
 \begin{itemize}
-	\item S = Number of substitutions (wrong words)
-	\item D = Number of deletions (missing words)
-	\item I = Number of insertions (extra words)
-	\item N = Total number of words in the reference
+	\item S = Number of substitutions
+	\item D = Number of deletions
+	\item I = Number of insertions 
+	\item N = Total number of words/character in the reference
 \end{itemize}

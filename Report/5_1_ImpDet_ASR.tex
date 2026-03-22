@@ -60,7 +60,7 @@ Test & 287 & 0.98 hours & 35.10 \\
 
 \textbf{Training Configuration}
 
-Training was performed using PyTorch Lightning together with the NeMo toolkit. Optimization was carried out using AdamW with decoupled weight decay. A cosine annealing scheduler was used to control the learning rate, together with a warmup phase to stabilize the initial training dynamics. Bfloat16 mixed precision training was enabled to reduce memory usage and accelerate computation on the available GPU hardware. The training hyperparameters are summarized in Table~\ref{tab:fastconformer_train}.
+Training was performed using PyTorch Lightning together with the NeMo toolkit. Optimization was carried out using AdamW with decoupled weight decay. A cosine annealing scheduler was used to control the learning rate, together with a warmup phase to stabilize the initial training dynamics. bfloat16 mixed precision training was enabled to reduce memory usage and accelerate computation on the available GPU hardware. The training hyperparameters are summarized in Table~\ref{tab:fastconformer_train}.
 
 \begin{table}[H]
 \caption{Training Hyperparameters}
@@ -71,7 +71,8 @@ Training was performed using PyTorch Lightning together with the NeMo toolkit. O
 \textbf{Parameter} & \textbf{Value} \\
 \hline
 Maximum Epochs & 15 \\
-Batch Size & 32 \\
+Train Batch Size & 32 \\
+Validation Batch Size & 64 \\
 Gradient Accumulation Steps & 2 \\
 Learning Rate & $1\times10^{-4}$ \\
 Minimum Learning Rate & $1\times10^{-6}$ \\
@@ -118,39 +119,39 @@ Early stopping was based on validation Word Error Rate (WER) as the monitoring m
 Monitor Metric & Validation WER \\
 Mode & Minimization \\
 Patience & 5 epochs \\
-Minimum Delta & 0.0 \\
+Minimum Delta & 0.001 \\
 Save Top K & 1 \\
 Checkpoint Frequency & Every 1 epoch \\
 \hline
 \end{tabular}
 \end{table}
 
-\textbf{Evaluation Metrics}
+% intetionally commented out 
 
-Standard ASR evaluation metrics were used to measure model performance. Word Error Rate (WER) was computed using Levenshtein distance between reference and hypothesis word sequences. Character Error Rate (CER) was calculated using character-level Levenshtein distance. These metrics were evaluated both through the PyTorch Lightning evaluation pipeline and through offline transcription on the validation and test sets. Whitespace was preserved during text normalization so that both metrics could be computed consistently. The model achieved a best validation WER of 3.240\%.
+% \textbf{Software and Hardware Environment}
 
-\textbf{Software and Hardware Environment}
+% A fixed software stack was used to ensure reproducibility of the implementation. All experiments were conducted on Google Colab using an NVIDIA Tesla T4 GPU. Deterministic training was enabled in warn-only mode to account for non-deterministic GPU CTC backward operations while maintaining reproducibility wherever possible. A random seed of 42 was used throughout the experiments. The software and hardware specifications are provided in Table~\ref{tab:fastconformer_env}.
 
-A fixed software stack was used to ensure reproducibility of the implementation. All experiments were conducted on Google Colab using an NVIDIA Tesla T4 GPU. Deterministic training was enabled in warn-only mode to account for non-deterministic GPU CTC backward operations while maintaining reproducibility wherever possible. A random seed of 42 was used throughout the experiments. The software and hardware specifications are provided in Table~\ref{tab:fastconformer_env}.
+% intetionally commented out 
 
-\begin{table}[H]
-\caption{Software and Hardware Configuration}
-\label{tab:fastconformer_env}
-\centering
-\begin{tabular}{|l|l|}
-\hline
-\textbf{Component} & \textbf{Version / Specification} \\
-\hline
-NVIDIA NeMo Toolkit & 2.4.0 \\
-PyTorch Lightning & $\geq$ 2.2.0, $<$ 2.6.0 \\
-Python & 3.12 \\
-CUDA & 12.8 \\
-NumPy & 1.26.4 \\
-GPU Accelerator & NVIDIA Tesla T4 \\
-Random Seed & 42 \\
-\hline
-\end{tabular}
-\end{table}
+% \begin{table}[H]
+% \caption{Software and Hardware Configuration}
+% \label{tab:fastconformer_env}
+% \centering
+% \begin{tabular}{|l|l|}
+% \hline
+% \textbf{Component} & \textbf{Version / Specification} \\
+% \hline
+% NVIDIA NeMo Toolkit & 2.4.0 \\
+% PyTorch Lightning & $\geq$ 2.2.0, $<$ 2.6.0 \\
+% Python & 3.12 \\
+% CUDA & 12.8 \\
+% NumPy & 1.26.4 \\
+% GPU Accelerator & NVIDIA Tesla T4 \\
+% Random Seed & 42 \\
+% \hline
+% \end{tabular}
+% \end{table}
 
 \textbf{Model Export and Checkpointing}
 
@@ -205,9 +206,9 @@ Validation & 3,955 & 3.82 & 3.48 \\
 
 \textbf{Training Hyperparameters and Optimization}
 
-The model was fine-tuned using PyTorch Lightning together with the AI4Bharat NeMo fork. AdamW with decoupled weight decay was used as the optimizer. The learning rate schedule followed a WarmupAnnealing strategy with 500 warmup steps followed by annealing. Training was conducted for up to 15 epochs with a batch size of 16 samples per step.
+The model was fine-tuned using PyTorch Lightning together with the AI4Bharat NeMo fork. AdamW was used as the optimizer. The learning rate schedule followed a CosineAnnealing strategy with a warmup phase. Training was conducted for up to 15 epochs with a batch size of 32 samples per step.
 
-Gradient clipping with a value of 1.0 was applied to stabilize optimization. Early stopping with a patience of 3 epochs was used based on validation WER to reduce overfitting. The full training configuration is given in Table~\ref{tab:indic_train}.
+Gradient clipping with a value of 1.0 was applied to stabilize optimization. Early stopping with a patience of 5 epochs was used based on validation WER to reduce overfitting. The full training configuration is given in Table~\ref{tab:indic_train}.
 
 \begin{table}[H]
 \caption{Training Hyperparameters}
@@ -217,18 +218,18 @@ Gradient clipping with a value of 1.0 was applied to stabilize optimization. Ear
 \hline
 \textbf{Hyperparameter} & \textbf{Value} \\
 \hline
-Maximum Epochs & 12 \\
+Maximum Epochs & 15 \\
 Training Batch Size & 32 \\
 Evaluation Batch Size & 64 \\
 Gradient Accumulation & 1 \\
-Learning Rate & $1\times10^{-6}$ \\
-Weight Decay & $5.0\times10^{-2}$ \\
-Warmup Steps & 500 \\
+Learning Rate & $5\times10^{-5}$ \\
+Weight Decay & $1\times10^{-3}$ \\
+Warmup Steps & 1000 \\
 Gradient Clipping & 1.0 \\
 Early Stopping Patience & 5 \\
 Early Stopping Min Delta & 0.001 \\
-Checkpoint Save Top K & 1 \\
-Validation Frequency & Every 3 Epochs \\
+Checkpoint Save Top K & 2 \\
+Validation Frequency & Every 1 Epochs \\
 \hline
 \end{tabular}
 \end{table}
@@ -251,60 +252,18 @@ Spectrogram Augmentation & Enabled \\
 Augmentation Kernel & Numba CUDA \\
 Precision & bf16-mixed\\
 Matrix Multiplication Precision & Medium \\
-Deterministic Mode & Disabled \\
 CuDNN Benchmark & Enabled \\
 \hline
 \end{tabular}
 \end{table}
 
-\textbf{Hardware and Software Environment}
+% need to take this to software and hardware requiremets in above sections
 
-All experiments were carried out in Google Colab with high-performance GPU acceleration. The software stack included the AI4Bharat fork of NVIDIA NeMo, patched for compatibility with NumPy 2.x runtimes. Particular attention was given to version compatibility for PyTorch and PyTorch Lightning to ensure reproducibility. The system specifications are shown in Table~\ref{tab:indic_env}.
+% \textbf{Hardware and Software Environment}
 
-\begin{table}[H]
-\caption{System and Software Specifications}
-\label{tab:indic_env}
-\centering
-\begin{tabular}{|l|l|}
-\hline
-\textbf{Component} & \textbf{Specification} \\
-\hline
-GPU & NVIDIA A100-SXM4-80GB \\
-CUDA Version & 12.8 \\
-PyTorch Version & 2.10.0+cu128 \\
-PyTorch Lightning & 2.6.1 \\
-NeMo Version & 1.23.0rc0 \\
-Python Version & 3.12 \\
-NumPy Version & 2.0.2 \\
-\hline
-\end{tabular}
-\end{table}
+% All experiments were carried out in Google Colab with high-performance GPU acceleration. The software stack included the AI4Bharat fork of NVIDIA NeMo, patched for compatibility with NumPy 2.x runtimes. Particular attention was given to version compatibility for PyTorch and PyTorch Lightning to ensure reproducibility. The system specifications are shown in Table~\ref{tab:indic_env}.
 
-\textbf{Evaluation Metrics and Checkpointing}
 
-Validation Word Error Rate (WER) and Character Error Rate (CER) were used as the primary performance metrics and were computed every second epoch. The training loop also tracked the individual CTC and RNNT loss components to monitor convergence of both objectives.
-
-Model checkpoints were selected based on the lowest validation WER, and the top two checkpoints were retained for final evaluation. The monitored metrics included training loss, validation loss, and the corresponding CTC and RNNT loss components. The evaluation and checkpointing setup is summarized in Table~\ref{tab:indic_eval}.
-
-\begin{table}[H]
-\caption{Training and Evaluation Metrics}
-\label{tab:indic_eval}
-\centering
-\begin{tabular}{|l|l|l|}
-\hline
-\textbf{Metric} & \textbf{Description} & \textbf{Monitoring Frequency} \\
-\hline
-Validation WER & Primary Optimization Metric & Every 1 Epoch \\
-Validation CER & Secondary Accuracy Metric & Every 1 Epoch \\
-Training Loss & Combined CTC and RNNT Loss & Every 5 Steps \\
-Validation Loss & Combined CTC and RNNT Loss & Every 1 Epoch \\
-Checkpoint Monitor & val\_wer\_eval & Every 1 Epoch \\
-Checkpoint Mode & Minimization & Every 1 Epoch \\
-Early Stopping & Patience = 3, Min Delta = 0.001 & Checked Every 1 Epoch \\
-Checkpoint Saving & Top 2 Model Saved & Based on Validation Metric \\
-\hline
-\end{tabular}
-\end{table}
 
 \subsubsection{Model Exporting and Quantization for Indic Conformer}
 
@@ -350,24 +309,3 @@ Activation Precision & FP32 \\
 \hline
 \end{tabular}
 \end{table}
-
-\textbf{Storage Optimization Results}
-
-The quantization pipeline resulted in a significant reduction in model storage size. Table~\ref{tab:quant_result} compares the original exported model with the quantized version.
-
-\begin{table}[H]
-\caption{Model Size Comparison Before and After Quantization}
-\label{tab:quant_result}
-\centering
-\begin{tabular}{|l|l|l|l|}
-\hline
-\textbf{Model Stage} & \textbf{Precision} & \textbf{File Size (MB)} & \textbf{Size Reduction (\%)} \\
-\hline
-Indic Conformer & FP32 & 493.05 & --- \\
-Exported ONNX & FP32 & 470.22 & 4.6\% \\
-Quantized ONNX & INT8 & 133.94 & 71.51\% \\
-\hline
-\end{tabular}
-\end{table}
-
-The quantized implementation reduced the model footprint by approximately 71.5\%, making it more suitable for deployment on edge devices and in environments with limited storage capacity. At the same time, the original inference logic of the architecture was preserved through ONNX Runtime execution.

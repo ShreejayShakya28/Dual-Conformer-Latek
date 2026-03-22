@@ -35,8 +35,6 @@ The fine-tuned model has only 13.2 million parameters, which is about 4x to 8x t
 
 The achieved WER of 6.14\% per cent is higher than the performance of higher-ranking models, most of which use three to eight times the number of parameters and large amounts of data augmentation, nevertheless, it is a strong performance-per-parameter trade-off. In the case of a situation where constraints in model size, power consumption, or real-time response are involved, the existing model provides a realistically compromised state. The use of a CTC-BPE hybrid output scheme avoids the use of outside language models during decoding, which simplifying the scheme, rather than the many transducer or attention-based models, retains a reasonable degree of sub-word level generalization.
 
-The WER of the model can be further improved to 4.08\% when using greedy decoding, a relatively inexpensive method of choosing the most likely token at each iteration without using a beam search or outside language model rescoring. The only difference is that this can be seen in the red dashed line (Overall WER: 4.08\%), much lower than the green dashed line that shows the average WER (4.49\%), across utterances, shows that not only does greedy decoding increase average accuracy, but also makes performance less varied. This finding highlights the strength of the CTC-BPE hybrid output layer: it is simple with limited decoder footprint, but it produces highly competitive transcription quality, particularly when the factors of inference constraints are important and marginal gains in complex modes of decoding are traded in at the cost of latency and compute efficiency.
-
 \subsubsection{WER, CER and Size Analysis of IndicConformer}
  
 \begin{table}[H]
@@ -79,36 +77,50 @@ The table compares the performance in noisy environments, which gives the charac
 
 The ONNX full model has the same CER and WER as the finetuned NeMo model with a slight reduction of the model size to 470.22 MB. The ONNX quantized model which is optimized to run at 133.94 MB only, experiences a slight degradation: CER increases to 16.08\% and WER to 37.96\%, with global CER/WER also on the rise, a classic trade-off between model size and accuracy.
 
-\subsubsection{Qualitative Analysis}
-To illustrate examples of model predictions on held-out utterances, below there are three representative samples, each paired with its ground-truth reference, the model’s hypothesis, and the corresponding Word Error Rate (WER):
 
-These examples demonstrate that the model accurately captures most of the semantic content. Errors are primarily lexical (e.g., “latter” vs. “latter day”, “to day” vs. “today”) or morphological, which are common in CTC-based systems without external language models. Notably, the model achieves perfect transcription on complex formal language in the second example, highlighting its robustness on well-articulated speech
+\subsubsection{Storage Optimization Results}
+
+The quantization pipeline resulted in a significant reduction in model storage size. Table~\ref{tab:quant_result} compares the original exported model with the quantized version.
+
+\begin{table}[H]
+\caption{Model Size Comparison Before and After Quantization}
+\label{tab:quant_result}
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Model Stage} & \textbf{Precision} & \textbf{File Size (MB)} & \textbf{Size Reduction (\%)} \\
+\hline
+Indic Conformer & FP32 & 493.05 & --- \\
+Exported ONNX & FP32 & 470.22 & 4.6\% \\
+Quantized ONNX & INT8 & 133.94 & 71.51\% \\
+\hline
+\end{tabular}
+\end{table}
+
+The quantized implementation reduced the model footprint by approximately 71.5\%, making it more suitable for deployment on edge devices and in environments with limited storage capacity. At the same time, the original inference logic of the architecture was preserved through ONNX Runtime execution.
 
 \subsubsection{Training Dynamics}
+
+\textbf{FastConformer Training Curves}
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochTrain_Loss.png}
-	\caption{Epoch-wise Training Loss}
+    \centering
+    \includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/fast/epoch_train_loss.png}
+    \caption{FastConformer training loss per epoch}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/fast/epoch_val_loss.png}
+    \caption{FastConformer validation loss per epoch}
 \end{figure}
 
-Training Loss (Figure 6-1) decreases steadily from 36.2 to 31.2, indicating consistent learning.
-
+\textbf{Indic Conformer Training Curves}
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochVal_Loss.png}
-	\caption{Epoch Wise Validation Loss}
+    \centering
+    \includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/indic/training_losses.png}
+    \caption{Indic Conformer training loss}
 \end{figure}
-Validation Loss (Figure 6-2) shows a similar downward trend, reaching 37.9 at epoch 7, with only minor fluctuations (e.g., a small uptick at epoch 5), suggesting good generalization without severe overfitting.
-
 \begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/BestVal_Loss.png}
-	\caption{Best Validation Loss (Cumulative Minimum)}
+    \centering
+    \includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/indic/validation_losses.png}
+    \caption{Indic Conformer validation loss}
 \end{figure}
-The Best Validation Loss (Figure 6-3) is monotonically non-increasing, confirming that the best checkpoint improves over time.
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/EpochGradient_Norm.png}
-	\caption{Gradient Norm per Epoch}
-\end{figure}
-The Gradient Norm (Figure 6-4) drops rapidly in early epochs and stabilizes around 180–185, signaling convergence and stable optimization. Collectively, these curves confirm a stable, well-behaved training process with no signs of divergence or instability.

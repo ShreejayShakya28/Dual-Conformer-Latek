@@ -4,36 +4,58 @@
 \subsection{Project Requirements}
 
 \subsubsection{Hardware requirements}
-\textbf{Google Colab}\\
+
+\textbf{Training (Google Colab)}\\
 \begin{table}[H]
-\caption{System Specifications}
-\label{tab:System Specifications}
+\caption{Training System Specifications}
+\label{tab:training-system-specifications}
 \centering
 \begin{tabular}{|l|l|}
 \hline
-\textbf{Component} & \textbf{Specification} \\
-\hline
+\textbf{Component} & \textbf{Specification} \\ \hline
 GPU & NVIDIA A100-SXM4-80GB \\
-CUDA Version & 12.8 \\
-\hline
+RAM & 167.1GB \\
+CUDA Version & 12.8 \\ \hline
 \end{tabular}
 \end{table}
 
+\textbf{Inference}\\
+\begin{table}[H]
+\caption{Inference System Specifications}
+\label{tab:inference-system-specifications}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Component} & \textbf{Specification} \\ \hline
+CPU & 13th Gen Intel(R) Core(TM) i5-13420H \\
+GPU & NVIDIA GeForce RTX 4050 \\
+RAM & 16 GB DDR5 \\ \hline
+\end{tabular}
+\end{table}
 
 \subsubsection{Software requirements}
 \begin{table}[H]
 \caption{Software Specifications}
-\label{tab:indic_env}
+
 \centering
 \begin{tabular}{|l|l|}
 \hline
 \textbf{Component} & \textbf{Specification} \\
 \hline
-PyTorch Version & 2.10.0+cu128 \\
+Python & 3.12 \\
+PyTorch & 2.4.0 \\
+Torchaudio & 2.4.0 \\
 PyTorch Lightning & 2.6.1 \\
-NeMo Version & 1.23.0rc0 \\
-Python Version & 3.12 \\
-NumPy Version & 2.0.2 \\
+NVIDIA NeMo & 2.7.0 \\
+NumPy & 2.0.2 \\
+Transformers & 4.44.0 \\
+Sentence-Transformers & 3.1.0 \\
+Sentencepiece & 0.2.0 \\
+ONNX Runtime & 1.24 \\
+FAISS (CPU) & 1.8.0 \\
+Deep-Translator & 1.11.4 \\
+gTTS & 2.5.4 \\
+Pydub & 0.25.1 \\
 \hline
 \end{tabular}
 \end{table}
