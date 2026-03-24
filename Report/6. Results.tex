@@ -9,11 +9,6 @@ The achieved WER of 6.14\% per cent is higher than the performance of higher-ran
 
 The WER of the model can be further improved to 4.08\% when using greedy decoding, a relatively inexpensive method of choosing the most likely token at each iteration without using a beam search or outside language model rescoring. The only difference is that this can be seen in the red dashed line (Overall WER: 4.08\%), much lower than the green dashed line that shows the average WER (4.49\%), across utterances, shows that not only does greedy decoding increase average accuracy, but also makes performance less varied. This finding highlights the strength of the CTC-BPE hybrid output layer: it is simple with limited decoder footprint, but it produces highly competitive transcription quality, particularly when the factors of inference constraints are important and marginal gains in complex modes of decoding are traded in at the cost of latency and compute efficiency.
 
-\begin{figure}[H]
-	\centering
-	\includegraphics[width=\linewidth]{Images/ASR/Results/shaswot-graphs/WER_LibriSpeech.png}
-	\caption{WER on LibriSpeech}
-\end{figure}
 
 \begin{table}[H]
 	\centering
